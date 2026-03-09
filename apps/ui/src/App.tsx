@@ -1,13 +1,15 @@
 import { type JSX } from "react"
 import { Button } from "./components/Button"
-import { RefreshLeftIcon } from "./components/icons"
+import { RefreshLeftIcon, SearchIcon } from "./components/icons"
 import { Card } from "./components/Card"
+import { InputTextGroup } from "./components/Input"
 
 export function App(): JSX.Element {
 
     return (
         <div className="flex flex-col gap-4 px-5">
             <h1>Note Taking App</h1>
+            <SearchIcon className="size-5 fill-neutral-600"/>
             <Button variant="primary">
                 <Button.Icon>
                     <RefreshLeftIcon className={`size-5`}/>
@@ -20,6 +22,13 @@ export function App(): JSX.Element {
                 </Button.Icon>
                 <Button.Text>Icon</Button.Text>
             </Button>
+            <InputTextGroup type="text" id="email" name="email" placeholder="Enter your email" errorMessage="This is an error text to help user.">
+                <InputTextGroup.Label>Email</InputTextGroup.Label>
+                <InputTextGroup.Input>
+                    <SearchIcon/>
+                </InputTextGroup.Input>
+                <InputTextGroup.Error/>
+            </InputTextGroup>
             <Card type="delete"/>
         </div>
     )
