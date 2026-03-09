@@ -1,6 +1,6 @@
 import { type JSX } from "react"
 import { SideBarNavigation, SideBarNotes } from "./components/SideBar"
-import { MenuBar, SettingsMenu } from "./components/Menu"
+import { MenuBar, RightMenuBar, SettingsMenu } from "./components/Menu"
 import { Header, HeaderControl } from "./components/Header"
 import { RefreshLeftIcon, SearchIcon, TagIcon } from "./components/Icon"
 import { Toast } from "./components/Toast"
@@ -15,6 +15,7 @@ export function App(): JSX.Element {
             <SideBarNotes/>
             <SideBarNavigation/>
             <SettingsMenu/>
+            <RightMenuBar/>
 
             <div className="flex flex-col gap-4 p-5">
                 <MenuBar/>
