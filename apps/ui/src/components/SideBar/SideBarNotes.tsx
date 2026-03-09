@@ -33,7 +33,7 @@ const notes = [
 export function SideBarNotes(): JSX.Element {
 
     return (
-        <div className="w-73 h-screen flex flex-col gap-y-4 pl-8 pr-4 py-5 border-r border-r-neutral-200">
+        <div className="max-lg:hidden min-w-73 h-screen flex flex-col gap-y-4 pl-8 pr-4 py-5 border-r border-r-neutral-200">
             <Button variant="primary">
                 <Button.Icon>
                     <PlusIcon className="size-6"/>
