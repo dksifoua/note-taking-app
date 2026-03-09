@@ -4,7 +4,8 @@ export type InputTextGroupContextType = {
     type: string
     id: string
     name: string
-    placeholder: string
+    placeholder?: string
+    link?: { to: string, text: string }
     errorMessage?: string
 }
 
@@ -15,6 +16,6 @@ export function useInputTextGroupContext(): InputTextGroupContextType {
     if (context === undefined) {
         throw new Error("useInputTextGroupContext must be used within a InputTextGroupContext.Provider")
     }
-    
+
     return context
 }

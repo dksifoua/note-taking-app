@@ -75,6 +75,16 @@
     --radius-full: 999px;
 }
 
+@layer base {
+    body {
+        @apply min-w-93.75 min-h-screen mx-auto
+    }
+    
+    #root {
+        @apply w-full h-full
+    }
+}
+
 @layer components {
     .text-preset-1 {
         font-family: var(--font-inter-bold), sans-serif;
