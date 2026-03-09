@@ -1,5 +1,5 @@
 import React, { type JSX, type PropsWithChildren } from "react"
-import { InfoCircleIcon } from "../icons"
+import { InfoCircleIcon } from "../Icon"
 import {
     InputTextGroupContext,
     type InputTextGroupContextType,

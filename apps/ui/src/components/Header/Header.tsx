@@ -1,6 +1,6 @@
 import { type JSX } from "react"
 import { InputTextGroup } from "../Input"
-import { SearchIcon, SettingIcon } from "../icons"
+import { SearchIcon, SettingIcon } from "../Icon"
 import { Logo } from "../Logo"
 
 export function Header(): JSX.Element {

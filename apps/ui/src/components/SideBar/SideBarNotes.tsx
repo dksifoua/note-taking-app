@@ -1,6 +1,6 @@
 import { type JSX } from "react"
 import { Button } from "../Button"
-import { PlusIcon } from "../icons"
+import { PlusIcon } from "../Icon"
 import React from "react"
 
 const notes = [
@@ -49,7 +49,7 @@ export function SideBarNotes(): JSX.Element {
 
                         return (
                             <React.Fragment key={noteIndex}>
-                                <div className={`flex flex-col gap-y-3 p-2 rounded-6 ${
+                                <div className={`w-60.5 flex flex-col gap-y-3 p-2 rounded-6 ${
                                     selected ? 'bg-neutral-100' : ''
                                 }`}>
                                     <p className="text-preset-3 text-neutral-950">{title}</p>

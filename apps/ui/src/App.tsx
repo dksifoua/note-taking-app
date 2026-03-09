@@ -1,8 +1,8 @@
 import { type JSX } from "react"
-import { SideBarNotes } from "./components/SideBar"
+import { SideBarNavigation, SideBarNotes } from "./components/SideBar"
 import { MenuBar } from "./components/Menu"
 import { Header, HeaderControl } from "./components/Header"
-import { RefreshLeftIcon, SearchIcon, TagIcon } from "./components/icons"
+import { RefreshLeftIcon, SearchIcon, TagIcon } from "./components/Icon"
 import { Toast } from "./components/Toast"
 import { Button } from "./components/Button"
 import { InputTextGroup } from "./components/Input"
@@ -13,6 +13,7 @@ export function App(): JSX.Element {
     return (
         <div className="flex flex-row gap-4 p-2">
             <SideBarNotes/>
+            <SideBarNavigation/>
             <div className="w-full flex flex-col gap-4 p-5">
                 <MenuBar/>
                 <HeaderControl/>
@@ -33,14 +34,18 @@ export function App(): JSX.Element {
                     </Button.Icon>
                     <Button.Text>Icon</Button.Text>
                 </Button>
-                <InputTextGroup type="text" id="email" name="email" placeholder="Enter your email" errorMessage="This is an error text to help user.">
+                <InputTextGroup type="text" id="email" name="email" placeholder="Enter your email"
+                                errorMessage="This is an error text to help user.">
                     <InputTextGroup.Label>Email</InputTextGroup.Label>
                     <InputTextGroup.Input>
                         <SearchIcon/>
                     </InputTextGroup.Input>
                     <InputTextGroup.Error/>
                 </InputTextGroup>
-                <Card type="delete"/>
+                <div className="flex flex-row gap-x-2">
+                    <Card type="archive"/>
+                    <Card type="delete"/>
+                </div>
             </div>
         </div>
     )

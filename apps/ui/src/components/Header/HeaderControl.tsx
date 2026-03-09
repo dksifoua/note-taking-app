@@ -1,5 +1,5 @@
 import { type JSX } from "react"
-import { ArchiveIcon, ArrowLeftIcon, DeleteIcon } from "../icons"
+import { ArchiveIcon, ArrowLeftIcon, DeleteIcon } from "../Icon"
 
 export function HeaderControl(): JSX.Element {
 

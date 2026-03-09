@@ -1,6 +1,5 @@
 import { type JSX } from "react"
-import { CheckCircleIcon } from "./icons/CheckCircleIcon"
-import { CloseRemoveIcon } from "./icons/CloseRemoveIcon"
+import { CheckCircleIcon, CloseRemoveIcon } from "./Icon"
 
 export function Toast({ message, link }: { message: string, link?: string }): JSX.Element {
 

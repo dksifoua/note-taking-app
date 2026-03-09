@@ -1,5 +1,5 @@
 import { type JSX } from "react"
-import { ArchiveIcon, HomeIcon, SearchIcon, SettingIcon, TagIcon } from "../icons"
+import { ArchiveIcon, HomeIcon, SearchIcon, SettingIcon, TagIcon } from "../Icon"
 
 export function MenuBar(): JSX.Element {
 
