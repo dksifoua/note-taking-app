@@ -1,4 +1,6 @@
+export { HideIcon } from "./HideIcon"
 export { InfoCircleIcon } from "./InfoCircleIcon"
+export { RefreshLeftIcon } from "./RefreshLeftIcon"
 export { SearchIcon } from "./SearchIcon"
 export { SettingIcon } from "./SettingIcon"
 export { ShowIcon } from "./ShowIcon"
