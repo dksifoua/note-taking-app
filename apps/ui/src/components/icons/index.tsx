@@ -1,3 +1,5 @@
+export { ArchiveIcon } from "./ArchiveIcon"
+export { DeleteIcon } from "./DeleteIcon"
 export { HideIcon } from "./HideIcon"
 export { InfoCircleIcon } from "./InfoCircleIcon"
 export { RefreshLeftIcon } from "./RefreshLeftIcon"

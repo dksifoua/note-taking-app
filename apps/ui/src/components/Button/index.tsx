@@ -3,6 +3,7 @@ import { SecondaryButton } from "./SecondaryButton"
 import { PrimaryButton } from "./PrimaryButton"
 import { BaseButton } from "./BaseButton"
 import { ButtonContext } from "./ButtonContext"
+import { DangerButton } from "./DangerButton"
 
 function ButtonFactory({ className, children }: PropsWithChildren<{ className?: string }>): JSX.Element {
     const { variant } = useContext(ButtonContext)
@@ -15,12 +16,16 @@ function ButtonFactory({ className, children }: PropsWithChildren<{ className?: 
         return <SecondaryButton className={className}>{children}</SecondaryButton>
     }
 
+    if (variant === "danger") {
+        return <DangerButton className={className}>{children}</DangerButton>
+    }
+
     return <BaseButton className={className}>{children}</BaseButton>
 }
 
 type ButtonProps = {
     className?: string
-    variant: "primary" | "secondary"
+    variant: "primary" | "secondary" | "danger"
 }
 
 export function Button({ className, variant, children }: PropsWithChildren<ButtonProps>): JSX.Element {
@@ -43,7 +48,11 @@ Button.Icon = function ({ children }: PropsWithChildren): JSX.Element {
         return <SecondaryButton.Icon>{children}</SecondaryButton.Icon>
     }
 
-    return <BaseButton.Element>{children}</BaseButton.Element>
+    if (variant === "danger") {
+        return <DangerButton.Icon>{children}</DangerButton.Icon>
+    }
+
+    return <BaseButton.Child>{children}</BaseButton.Child>
 }
 
 Button.Text = function ({ children }: PropsWithChildren): JSX.Element {
@@ -57,5 +66,9 @@ Button.Text = function ({ children }: PropsWithChildren): JSX.Element {
         return <SecondaryButton.Text>{children}</SecondaryButton.Text>
     }
 
-    return <BaseButton.Element>{children}</BaseButton.Element>
+    if (variant === "danger") {
+        return <DangerButton.Text>{children}</DangerButton.Text>
+    }
+
+    return <BaseButton.Child>{children}</BaseButton.Child>
 }

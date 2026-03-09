@@ -1,6 +1,7 @@
 import { type JSX } from "react"
 import { Button } from "./components/Button"
 import { RefreshLeftIcon } from "./components/icons"
+import { Card } from "./components/Card"
 
 export function App(): JSX.Element {
 
@@ -19,6 +20,7 @@ export function App(): JSX.Element {
                 </Button.Icon>
                 <Button.Text>Icon</Button.Text>
             </Button>
+            <Card type="delete"/>
         </div>
     )
 }
