@@ -3,6 +3,7 @@ import { Button } from "./components/Button"
 import { RefreshLeftIcon, SearchIcon } from "./components/icons"
 import { Card } from "./components/Card"
 import { InputTextGroup } from "./components/Input"
+import { Toast } from "./components/Toast"
 
 export function App(): JSX.Element {
 
@@ -10,6 +11,8 @@ export function App(): JSX.Element {
         <div className="flex flex-col gap-4 px-5">
             <h1>Note Taking App</h1>
             <SearchIcon className="size-5 fill-neutral-600"/>
+            <Toast message="Note saved successfully!"/>
+            <Toast message="Note archived." link="Archived Notes"/>
             <Button variant="primary">
                 <Button.Icon>
                     <RefreshLeftIcon className={`size-5`}/>
