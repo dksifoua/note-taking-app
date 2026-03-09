@@ -1,0 +1,19 @@
+{
+    "name": "note-taking-app",
+    "type": "module",
+    "module": "index.ts",
+    "private": true,
+    "workspaces": ["apps/*"],
+    "scripts": {
+        "api:dev": "cd apps/api && bun run dev",
+        "ui:dev": "cd apps/ui && bun run dev",
+        "dev": "concurrently -n 'api,ui' -c 'green,blue' 'bun run api:dev' 'bun run ui:dev'"
+    },
+    "devDependencies": {
+        "@types/bun": "latest",
+        "concurrently": "^9.2.1"
+    },
+    "peerDependencies": {
+        "typescript": "^5"
+    }
+}
