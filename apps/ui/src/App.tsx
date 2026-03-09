@@ -1,8 +1,7 @@
 import { type JSX } from "react"
 import { BrowserRouter, Route, Routes } from "react-router"
 import { Components } from "./Components"
-import { AuthLayout } from "./pages/Auth"
-import { AuthPage } from "./pages/Auth/AuthPage"
+import { AuthLayout, ForgotPasswordPage, LoginPage, RegisterPage } from "./pages/Auth"
 
 export function App(): JSX.Element {
 
@@ -11,8 +10,9 @@ export function App(): JSX.Element {
             <Routes>
                 <Route path="/components" element={<Components/>}/>
                 <Route element={<AuthLayout/>}>
-                    <Route path="login" element={<AuthPage/>}/>
-                    <Route path="register" element={<h1>Register</h1>}/>
+                    <Route path="login" element={<LoginPage/>}/>
+                    <Route path="register" element={<RegisterPage/>}/>
+                    <Route path="forgot-password" element={<ForgotPasswordPage/>}/>
                 </Route>
             </Routes>
         </BrowserRouter>

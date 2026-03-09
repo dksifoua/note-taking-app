@@ -5,6 +5,7 @@ import {
     type InputTextGroupContextType,
     useInputTextGroupContext
 } from "./InputTextGroupContext"
+import { NavLink } from "react-router"
 
 type InputTextGroupProps = InputTextGroupContextType & {
     className?: string
@@ -30,7 +31,9 @@ InputTextGroup.Label = function ({ children }: PropsWithChildren): JSX.Element {
         <div className="flex flex-row items-center justify-between">
             <label htmlFor={id} className="text-preset-4 text-neutral-950">{children}</label>
             {
-                link && <a href={link.to} className="text-preset-6 text-neutral-600 underline">{link.text}</a>
+                link && <NavLink to={link.to}>
+                    <span className="text-preset-6 text-neutral-600 underline">{link.text}</span>
+                </NavLink>
             }
         </div>
     )
