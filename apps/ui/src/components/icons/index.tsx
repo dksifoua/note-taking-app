@@ -1,4 +1,6 @@
 export { ArchiveIcon } from "./ArchiveIcon"
+export { ArrowLeftIcon } from "./ArrowLeftIcon"
+export { CloseRemoveIcon } from "./CloseRemoveIcon"
 export { DeleteIcon } from "./DeleteIcon"
 export { HideIcon } from "./HideIcon"
 export { InfoCircleIcon } from "./InfoCircleIcon"

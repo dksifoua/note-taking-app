@@ -4,12 +4,14 @@ import { RefreshLeftIcon, SearchIcon } from "./components/icons"
 import { Card } from "./components/Card"
 import { InputTextGroup } from "./components/Input"
 import { Toast } from "./components/Toast"
+import { Header, HeaderControl } from "./components/Header"
 
 export function App(): JSX.Element {
 
     return (
-        <div className="flex flex-col gap-4 px-5">
-            <h1>Note Taking App</h1>
+        <div className="flex flex-col gap-4 p-5">
+            <HeaderControl/>
+            <Header/>
             <SearchIcon className="size-5 fill-neutral-600"/>
             <Toast message="Note saved successfully!"/>
             <Toast message="Note archived." link="Archived Notes"/>
