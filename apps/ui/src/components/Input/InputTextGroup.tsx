@@ -1,35 +1,30 @@
 import React, { type JSX, type PropsWithChildren } from "react"
 import { InfoCircleIcon } from "../Icon"
-import {
-    InputTextGroupContext,
-    type InputTextGroupContextType,
-    useInputTextGroupContext
-} from "./InputTextGroupContext"
 import { NavLink } from "react-router"
 
-type InputTextGroupProps = InputTextGroupContextType & {
+type InputTextGroupProps = {
     className?: string
 }
 
-export function InputTextGroup(
-    { type, id, name, className, placeholder, errorMessage, link, children }: PropsWithChildren<InputTextGroupProps>
-): JSX.Element {
+export function InputTextGroup({ className, children }: PropsWithChildren<InputTextGroupProps>): JSX.Element {
 
     return (
-        <InputTextGroupContext.Provider value={{ type, id, name, placeholder, errorMessage, link }}>
-            <div className={`flex flex-col gap-y-1.5 ${className}`}>
-                {children}
-            </div>
-        </InputTextGroupContext.Provider>
+        <div className={`flex flex-col gap-y-1.5 ${className}`}>
+            {children}
+        </div>
     )
 }
 
-InputTextGroup.Label = function ({ children }: PropsWithChildren): JSX.Element {
-    const { id, link } = useInputTextGroupContext()
+type LabelProps = {
+    htmlFor: string
+    link?: { to: string, text: string }
+}
+
+InputTextGroup.Label = function ({ htmlFor, link, children }: PropsWithChildren<LabelProps>): JSX.Element {
 
     return (
         <div className="flex flex-row items-center justify-between">
-            <label htmlFor={id} className="text-preset-4 text-neutral-950">{children}</label>
+            <label htmlFor={htmlFor} className="text-preset-4 text-neutral-950">{children}</label>
             {
                 link && <NavLink to={link.to}>
                     <span className="text-preset-6 text-neutral-600 underline">{link.text}</span>
@@ -39,24 +34,32 @@ InputTextGroup.Label = function ({ children }: PropsWithChildren): JSX.Element {
     )
 }
 
-InputTextGroup.Input = function ({ RightIcon }: {
-    RightIcon?: React.ComponentType<{ className?: string }>
-}): JSX.Element {
-    const { type, id, name, placeholder } = useInputTextGroupContext()
+type InputProps = {
+    type: string
+    id: string
+    name: string
+    placeholder?: string
+    icon?: {
+        Icon: React.ComponentType<{ className?: string }>
+        css: "fill" | "stroke"
+    }
+}
+
+InputTextGroup.Input = function (
+    { type, id, name, placeholder, icon, children }: PropsWithChildren<InputProps>
+): JSX.Element {
 
     return (
         <div className="flex flex-row gap-x-1 px-4 py-3 rounded-8 border border-neutral-300">
+            {icon && <icon.Icon className={`size-5 ${icon.css}-neutral-500`}/>}
             <input type={type} id={id} name={name} placeholder={placeholder}
                    className="w-full focus:outline-none text-preset-5 text-neutral-950 placeholder:text-neutral-500"/>
-            {
-                RightIcon && <RightIcon className="size-5 fill-neutral-500"/>
-            }
+            {children}
         </div>
     )
 }
 
-InputTextGroup.Error = function (): JSX.Element {
-    const { errorMessage } = useInputTextGroupContext()
+InputTextGroup.Error = function ({ errorMessage }: { errorMessage?: string }): JSX.Element {
 
     if (!errorMessage || errorMessage.trim().length === 0) {
         return <></>

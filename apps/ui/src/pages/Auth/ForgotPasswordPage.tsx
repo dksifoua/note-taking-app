@@ -12,9 +12,9 @@ export function ForgotPasswordPage(): JSX.Element {
         >
             <AuthContainer.Form>
                 <React.Fragment>
-                    <InputTextGroup type="email" id="email" name="email" placeholder="email@example.com" errorMessage="">
-                        <InputTextGroup.Label>Email Address</InputTextGroup.Label>
-                        <InputTextGroup.Input/>
+                    <InputTextGroup>
+                        <InputTextGroup.Label htmlFor="email">Email Address</InputTextGroup.Label>
+                        <InputTextGroup.Input type="email" id="email" name="email" placeholder="email@example.com"/>
                         <InputTextGroup.Error/>
                     </InputTextGroup>
                     <Button variant="primary">

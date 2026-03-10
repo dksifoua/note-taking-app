@@ -37,13 +37,11 @@ export function Components(): JSX.Element {
                     </Button.Icon>
                     <Button.Text>Icon</Button.Text>
                 </Button>
-                <InputTextGroup type="text" id="email" name="email" placeholder="Enter your email"
-                                errorMessage="This is an error text to help user.">
-                    <InputTextGroup.Label>Email</InputTextGroup.Label>
-                    <InputTextGroup.Input>
-                        <SearchIcon/>
-                    </InputTextGroup.Input>
-                    <InputTextGroup.Error/>
+                <InputTextGroup>
+                    <InputTextGroup.Label htmlFor="email">Email</InputTextGroup.Label>
+                    <InputTextGroup.Input type="text" id="email" name="email" placeholder="Enter your email"
+                                          icon={{Icon: SearchIcon, css: "fill"}}/>
+                    <InputTextGroup.Error errorMessage="This is an error text to help user."/>
                 </InputTextGroup>
                 <div className="flex flex-row gap-x-2">
                     <Card type="archive"/>
