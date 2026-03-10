@@ -64,7 +64,7 @@ export function SideBarNotes(): JSX.Element {
                                     <p className="text-preset-6 text-neutral-700">{date}</p>
                                 </div>
                                 {
-                                    !selected && noteIndex < notes.length 
+                                    !selected && noteIndex < notes.length - 1
                                     && <div className="w-full border border-neutral-200"/>
                                 }
                             </React.Fragment>

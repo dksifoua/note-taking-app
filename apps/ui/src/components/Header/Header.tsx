@@ -16,8 +16,10 @@ export function Header(): JSX.Element {
                 <p className="text-preset-1 text-neutral-950">All Notes</p>
                 <div className="flex flex-row gap-x-4 items-center justify-between">
                     <InputTextGroup>
-                        <InputTextGroup.Input type="search" id="search" name="search"
-                                              placeholder="Search by title, content, or tags…" icon={{Icon: SearchIcon, css: "fill"}}/>
+                        <InputTextGroup.Input className="w-75"
+                                              type="search" id="search" name="search"
+                                              placeholder="Search by title, content, or tags…"
+                                              icon={{Icon: SearchIcon, css: "fill"}}/>
                     </InputTextGroup>
                     <div className="flex items-center justify-center">
                         <SettingIcon className="size-6 fill-neutral-500"/>

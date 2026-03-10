@@ -5,7 +5,7 @@ export function MenuBar(): JSX.Element {
 
     return (
         <div
-            className="lg:hidden h-14 md:h-18 flex flex-row px-4 md:px-8 py-3 items-center justify-between border-t border-t-neutral-200">
+            className="lg:hidden h-14 md:h-18 min-w-93.75 flex flex-row px-4 md:px-8 py-3 items-center justify-between border-t border-t-neutral-200">
             <div className={`w-20 flex md:flex-col gap-y-1 py-1 items-center justify-center bg-blue-50 rounded-4`}>
                 <HomeIcon className={`size-6 fill-blue-500`}/>
                 <p className={`max-md:hidden text-preset-6 text-blue-500`}>Home</p>

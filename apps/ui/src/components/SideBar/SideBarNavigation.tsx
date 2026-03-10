@@ -7,8 +7,10 @@ const tags = ["Work", "Personal", "Ideas", "Projects", "Travel", "Health", "Fina
 export function SideBarNavigation(): JSX.Element {
 
     return (
-        <div className="max-lg:hidden min-w-73 h-screen flex flex-col gap-y-4 px-4 py-3 border-r border-r-neutral-200">
-            <Logo/>
+        <div className="max-lg:hidden min-w-68 h-screen flex flex-col gap-y-4 px-4 py-3 border-r border-r-neutral-200">
+            <div className="w-60 h-13 py-3 items-center">
+                <Logo/>
+            </div>
             <div className="flex flex-col gap-y-2">
                 <div className="flex flex-col gap-y-1 justify-between">
                     <div

@@ -1,9 +1,9 @@
 import { type JSX } from "react"
 
-export function Logo(): JSX.Element {
+export function Logo({ className }: { className?: string }): JSX.Element {
 
     return (
-        <svg width="95" height="28" viewBox="0 0 95 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <svg className={`w-23.75 h-7 ${className}`} viewBox="0 0 95 28" fill="none" xmlns="http://www.w3.org/2000/svg">
             <g clipPath="url(#clip0_2359_17916)">
                 <g clipPath="url(#clip1_2359_17916)">
                     <path fillRule="evenodd" clipRule="evenodd"

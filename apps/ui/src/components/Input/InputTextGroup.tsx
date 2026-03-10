@@ -43,14 +43,15 @@ type InputProps = {
         Icon: React.ComponentType<{ className?: string }>
         css: "fill" | "stroke"
     }
+    className?: string
 }
 
 InputTextGroup.Input = function (
-    { type, id, name, placeholder, icon, children }: PropsWithChildren<InputProps>
+    { type, id, name, placeholder, icon, className, children }: PropsWithChildren<InputProps>
 ): JSX.Element {
 
     return (
-        <div className="flex flex-row gap-x-1 px-4 py-3 rounded-8 border border-neutral-300">
+        <div className={`flex flex-row gap-x-1 px-4 py-3 rounded-8 border border-neutral-300 ${className}`}>
             {icon && <icon.Icon className={`size-5 ${icon.css}-neutral-500`}/>}
             <input type={type} id={id} name={name} placeholder={placeholder}
                    className="w-full focus:outline-none text-preset-5 text-neutral-950 placeholder:text-neutral-500"/>
