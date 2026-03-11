@@ -3,7 +3,7 @@
     "type": "module",
     "module": "index.ts",
     "private": true,
-    "workspaces": ["apps/*"],
+    "workspaces": ["apps/*", "packages/*"],
     "scripts": {
         "api:dev": "cd apps/api && bun run dev",
         "ui:dev": "cd apps/ui && bun run dev",

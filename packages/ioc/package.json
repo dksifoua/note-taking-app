@@ -1,0 +1,16 @@
+{
+    "name": "ioc",
+    "module": "src/index.ts",
+    "type": "module",
+    "scripts": {},
+    "devDependencies": {
+        "@types/bun": "latest"
+    },
+    "peerDependencies": {
+        "typescript": "^5"
+    },
+    "dependencies": {
+        "@deepkit/bun": "^1.0.19",
+        "@deepkit/type": "^1.0.19"
+    }
+}
