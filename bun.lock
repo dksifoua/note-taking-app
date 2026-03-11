@@ -16,6 +16,7 @@
       "name": "api",
       "devDependencies": {
         "@types/bun": "latest",
+        "ioc": "*",
       },
       "peerDependencies": {
         "typescript": "^5",

@@ -1,15 +1,20 @@
 {
-    "name": "api",
+    "name": "note-taking-api",
+    "description": "A simple note-taking API built with Bun and TypeScript",
+    "version": "0.0.1",
+    "author": "Dimitri Sifoua <dimitri.sifoua@.com>",
+    "license": "MIT",
+    "type": "module",
     "module": "index.ts",
-    "devDependencies": {
-        "@types/bun": "latest"
-    },
-    "peerDependencies": {
-        "typescript": "^5"
-    },
     "private": true,
     "scripts": {
         "dev": "bun --hot run index.ts"
     },
-    "type": "module"
+    "devDependencies": {
+        "ioc": "*",
+        "@types/bun": "latest"
+    },
+    "peerDependencies": {
+        "typescript": "^5"
+    }
 }
