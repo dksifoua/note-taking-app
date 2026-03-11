@@ -4,11 +4,11 @@ import type { IDisposable, ServiceIdentifier } from "../src/types"
 import {
     CannotResolveServiceProviderError,
     CircularDependencyError,
-    RequiredScopedServiceProviderError, ServiceDisposedError,
+    RequiredScopedServiceProviderError,
+    ServiceDisposedError,
     ServiceNotRegisteredError
 } from "../src/error"
 import { ScopedServiceProvider, ServiceProvider } from "../src/provider"
-import * as test from "node:test"
 
 // ----------------------------------------------------------------------
 // Helper Classes and Interfaces for Testing
@@ -267,12 +267,7 @@ describe("ServiceProviderTest", (): void => {
             expect(() => provider.dispose()).not.toThrow()
         })
     })
-    
-    describe("caching parameter", (): void => {
-        
-        test.todo("should cache constructor parameter types after first resolution", (): void => {})
-    })
-    
+
     describe("scoped provider", (): void => {
         
         it("should dispose scoped instances when scope is disposed", (): void => {
@@ -294,9 +289,85 @@ describe("ServiceProviderTest", (): void => {
             scope.dispose()
             expect(() => scope.resolve(TestDisposable)).toThrow(ServiceDisposedError)
         })
-        
-        test.todo("should isolate partial failures during scoped service creation")
-        test.todo("should not leak partially created dependencies when a factory throws")
+
+        it("should isolate partial failures during scoped service creation", (): void => {
+            class DependencyA extends TestDisposable {}
+            class DependencyB extends TestDisposable {}
+            class FailingService {
+                constructor(public a: DependencyA, public b: DependencyB) {
+                    throw new Error("Construction failed")
+                }
+            }
+
+            services.addScoped(DependencyA)
+            services.addScoped(DependencyB)
+            services.addScoped(FailingService)
+
+            const provider = services.build()
+            const scope = provider.createScope()
+
+            // First attempt should fail and clean up temporary dependencies
+            expect(() => scope.resolve(FailingService)).toThrow(/Construction failed/)
+
+            // Dependencies should NOT be leaked into the main scope
+            // If we manually resolve them, they should be new instances
+            const depA = scope.resolve(DependencyA)
+            const depB = scope.resolve(DependencyB)
+
+            // The failed attempt's dependencies should have been disposed
+            expect(depA).toBeInstanceOf(DependencyA)
+            expect(depB).toBeInstanceOf(DependencyB)
+
+            // When we dispose of the scope, only the successfully created instances should be disposed
+            expect(depA.isDisposed()).toBe(false)
+            expect(depB.isDisposed()).toBe(false)
+
+            scope.dispose()
+
+            expect(depA.isDisposed()).toBe(true)
+            expect(depB.isDisposed()).toBe(true)
+        })
+
+        it("should not leak partially created dependencies when a factory throws", (): void => {
+            class DependencyA extends TestDisposable {}
+            class DependencyB extends TestDisposable {}
+
+            let createdInstances: TestDisposable[] = []
+
+            services.addScoped(DependencyA)
+            services.addScoped(DependencyB)
+            services.addScopedFactory("FailingFactory", (provider) => {
+                // Resolve dependencies first
+                const a = provider.resolve(DependencyA)
+                const b = provider.resolve(DependencyB)
+
+                // Track what was created
+                createdInstances.push(a, b)
+
+                // Then throw
+                throw new Error("Factory failed")
+            })
+
+            const provider = services.build()
+            const scope = provider.createScope()
+
+            // Attempt to resolve the failing factory
+            expect(() => scope.resolve("FailingFactory")).toThrow(/Factory failed/)
+
+            // The partially created dependencies should have been disposed
+            expect(createdInstances.length).toBe(2)
+            expect(createdInstances[0]!.isDisposed()).toBe(true)
+            expect(createdInstances[1]!.isDisposed()).toBe(true)
+
+            // The main scope should be clean - resolving dependencies again should create new instances
+            const newA = scope.resolve(DependencyA)
+            const newB = scope.resolve(DependencyB)
+
+            expect(newA).toBeInstanceOf(DependencyA)
+            expect(newB).toBeInstanceOf(DependencyB)
+            expect(newA.isDisposed()).toBe(false)
+            expect(newB.isDisposed()).toBe(false)
+        })
     })
     
     describe("type safety (runtime behavior)", (): void => {
