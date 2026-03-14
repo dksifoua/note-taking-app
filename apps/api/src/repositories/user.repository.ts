@@ -4,6 +4,7 @@ import type { IUserDocument, IUserRepository } from "./contracts"
 import type { ClientSession } from "mongoose"
 
 export class UserRepository implements IUserRepository {
+    public static $inject = [DatabaseContext]
     private readonly context: DatabaseContext
 
     public constructor(databaseContext: DatabaseContext) {

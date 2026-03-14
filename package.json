@@ -3,15 +3,18 @@
     "type": "module",
     "module": "index.ts",
     "private": true,
-    "workspaces": ["apps/*", "packages/*"],
+    "workspaces": ["apps/*", "packages/*"], 
     "scripts": {
         "api:dev": "bun run --filter note-taking-api --env-file=.env.api.local dev",
+        "http:test": "bun run --filter @shared/http test",
+        "ioc:test": "bun run --filter @shared/ioc test",
+        "logging:test": "bun run --filter @shared/logging test",
         "ui:dev": "bun run --filter note-taking-ui dev",
-        "dev": "concurrently -n 'api,ui' -c 'green,blue' 'bun run api:dev' 'bun run ui:dev'"
+        "dev": "bun run --filter \"*\" dev",
+        "test": "bun run --filter \"*\" test"
     },
     "devDependencies": {
-        "@types/bun": "latest",
-        "concurrently": "^9.2.1"
+        "@types/bun": "latest"
     },
     "peerDependencies": {
         "typescript": "^5"

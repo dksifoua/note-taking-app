@@ -11,12 +11,14 @@ export class HttpRouter implements IHttpRouter {
         this.handle = this.handle.bind(this)
     }
 
-    public mount(prefix: string, router: IHttpRouter): void {
+    public mount(prefix: string, router: IHttpRouter): IHttpRouter {
         const normalisedPrefix = prefix.replace(/\/$/, "")
 
         for (const route of router.routes) {
             this.add(route.method, normalisedPrefix + route.pathname.replace(/\/$/, ""), route.handlerFn)
         }
+        
+        return this
     }
 
     public async handle(request: Request, scope: IScopedServiceProvider): Promise<Response> {

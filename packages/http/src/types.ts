@@ -34,7 +34,7 @@ export interface IHttpMiddleware {
 export interface IHttpRouter {
     readonly routes: HttpCompiledRoute[]
     
-    mount(prefix: string, router: IHttpRouter): void
+    mount(prefix: string, router: IHttpRouter): IHttpRouter
     handle(request: Request, scope: IScopedServiceProvider): MayBePromise<Response>
     
     get(pathname: string, handler: HttpHandler): IHttpRouter

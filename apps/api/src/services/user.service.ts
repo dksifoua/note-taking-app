@@ -1,10 +1,12 @@
 import type { IUserDocument, IUserRepository } from "../repositories/contracts"
 import type { IUserService } from "./contracts"
+import { UserRepository } from "../repositories"
 
 export class UserService implements IUserService {
+    public static $inject = [UserRepository]
     private readonly userRepository: IUserRepository
 
-    public constructor(userRepository: IUserRepository) {
+    public constructor(userRepository: UserRepository) {
         this.userRepository = userRepository
     }
     
