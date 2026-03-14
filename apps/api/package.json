@@ -5,16 +5,23 @@
     "author": "Dimitri Sifoua <dimitri.sifoua@.com>",
     "license": "MIT",
     "type": "module",
-    "module": "index.ts",
+    "module": "src/index.ts",
     "private": true,
     "scripts": {
-        "dev": "bun --hot run index.ts"
+        "dev": "bun --hot run src/index.ts"
     },
     "devDependencies": {
-        "ioc": "*",
+        "@types/bcrypt": "^6.0.0",
         "@types/bun": "latest"
     },
     "peerDependencies": {
         "typescript": "^5"
+    },
+    "dependencies": {
+        "@shared/http": "workspace:*",
+        "@shared/ioc": "workspace:*",
+        "@shared/logging": "workspace:*",
+        "bcrypt": "^6.0.0",
+        "mongoose": "^9.3.0"
     }
 }

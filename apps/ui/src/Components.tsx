@@ -47,6 +47,7 @@ export function Components(): JSX.Element {
                     <Card type="archive"/>
                     <Card type="delete"/>
                 </div>
+                <MenuBar/>
             </div>
         </div>
     )

@@ -1,14 +1,17 @@
 export type Constructor<TService = any> = new (...args: any[]) => TService
+export type AbstractConstructor<TService = any> = abstract new (...args: any[]) => TService
 
-export type ServiceIdentifier<TService = any> = string | symbol | Constructor<TService>
+export type ServiceIdentifier<TService = any> = string | symbol | Constructor<TService> | AbstractConstructor<TService>
 
 export type ServiceLifetime = "transient" | "scoped" | "singleton"
 
-export interface IServiceProvider {
-    resolve<TService = any>(service: ServiceIdentifier<TService>, scope?: IServiceProvider): TService
+export interface IServiceProvider extends IDisposable {
+    resolve<TService = any>(service: ServiceIdentifier<TService>): TService
+    createScope(): IScopedServiceProvider
 }
 
 export interface IScopedServiceProvider extends IServiceProvider {
+    resolve<TService = any>(service: ServiceIdentifier<TService>): TService
     getOrCreateInstance<TService = any>(
         service: ServiceIdentifier<TService>,
         factory: (scope: IScopedServiceProvider) => TService

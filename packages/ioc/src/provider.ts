@@ -1,6 +1,5 @@
 import type {
     Constructor,
-    IDisposable,
     IScopedServiceProvider,
     IServiceProvider,
     ServiceDescriptor,
@@ -8,6 +7,7 @@ import type {
 } from "./types"
 import {
     CannotResolveServiceProviderError,
+    CaptiveDependencyError,
     CircularDependencyError,
     NoMetadataFoundError,
     RequiredScopedServiceProviderError,
@@ -16,30 +16,28 @@ import {
 } from "./error"
 import { ReflectionClass } from "@deepkit/type"
 
-export class ServiceProvider implements IServiceProvider, IDisposable {
+export class ServiceProvider implements IServiceProvider {
     private readonly descriptors: Map<ServiceIdentifier, ServiceDescriptor>
     private readonly singletons: Map<ServiceIdentifier, any>
-    private readonly resolutionStack: Set<ServiceIdentifier>
     private readonly paramCache: WeakMap<Constructor, ServiceIdentifier[]>
     private disposed: boolean
 
     public constructor(descriptors: Array<ServiceDescriptor>) {
-        this.descriptors = new Map<ServiceIdentifier, ServiceDescriptor>()
-        this.singletons = new Map<ServiceIdentifier, any>()
-        this.resolutionStack = new Set<ServiceIdentifier>()
-        this.paramCache = new WeakMap<Constructor, ServiceIdentifier[]>()
+        this.descriptors = new Map()
+        this.singletons = new Map()
+        this.paramCache = new WeakMap()
         this.disposed = false
 
-        descriptors.forEach((descriptor: ServiceDescriptor): void => {
+        for (const descriptor of descriptors) {
             this.descriptors.set(descriptor.service, descriptor)
-        })
+        }
     }
 
     public isDisposed(): boolean {
         return this.disposed
     }
 
-    public createScope(): ScopedServiceProvider {
+    public createScope(): IScopedServiceProvider {
         this.ensureNotDisposed()
         return new ScopedServiceProvider(this)
     }
@@ -47,6 +45,15 @@ export class ServiceProvider implements IServiceProvider, IDisposable {
     public resolve<TService>(
         service: ServiceIdentifier<TService>,
         scope?: IScopedServiceProvider
+    ): TService {
+        return this.resolveInternal(service, new Set(), false, scope)
+    }
+
+    private resolveInternal<TService>(
+        service: ServiceIdentifier<TService>,
+        resolutionStack: Set<ServiceIdentifier>,
+        isSingletonContext: boolean,
+        scope?: IScopedServiceProvider,
     ): TService {
         this.ensureNotDisposed()
 
@@ -56,30 +63,43 @@ export class ServiceProvider implements IServiceProvider, IDisposable {
 
         const descriptor = this.descriptors.get(service) as ServiceDescriptor<TService> | undefined
         if (!descriptor) {
-            throw new ServiceNotRegisteredError(`Service not registered: ${typeof service === "function" ? service.name : String(service)}`)
+            throw new ServiceNotRegisteredError(`Service not registered: ${
+                typeof service === "function" ? service.name : String(service)
+            }`)
         }
 
         // Check for circular dependency
-        if (this.resolutionStack.has(service)) {
-            const stack = Array.from(this.resolutionStack)
+        if (resolutionStack.has(service)) {
+            const stack: string = [...resolutionStack, service]
                 .map((s: ServiceIdentifier): string => typeof s === "function" ? s.name : String(s))
-                .concat(typeof service === "function" ? service.name : String(service))
                 .join(" -> ")
             throw new CircularDependencyError(`Circular dependency detected: ${stack}`)
         }
 
-        let instance: TService
+        // Captive dependency: singleton depending on a scoped service
+        // would cause the scoped instance to outlive its intended scope
+        if (isSingletonContext && descriptor.lifetime === "scoped") {
+            const name: string = typeof service === "function" ? service.name : String(service)
+            throw new CaptiveDependencyError(
+                `Captive dependency detected: singleton is depending on scoped service '${name}'.`
+            )
+        }
+
         switch (descriptor.lifetime) {
-            case "scoped":
+            case "scoped": {
                 if (scope === undefined) {
                     throw new RequiredScopedServiceProviderError("Scope is required for scoped lifetime")
                 }
-                instance = scope.getOrCreateInstance(service, (s: IScopedServiceProvider): TService => this.createInstance(descriptor, s))
-                break
-            case "transient":
-                instance = this.createInstance(descriptor, scope)
-                break
-            case "singleton":
+                return scope.getOrCreateInstance(service, (s: IScopedServiceProvider): TService =>
+                    this.createInstance(descriptor, resolutionStack, false, s)
+                )
+            }
+
+            case "transient": {
+                return this.createInstance(descriptor, resolutionStack, isSingletonContext, scope)
+            }
+
+            case "singleton": {
                 if (descriptor.instance !== undefined) {
                     return descriptor.instance as TService
                 }
@@ -88,20 +108,23 @@ export class ServiceProvider implements IServiceProvider, IDisposable {
                     return this.singletons.get(service) as TService
                 }
 
-                instance = this.createInstance(descriptor)
+                // Singletons resolve without a scope — any scoped dependency is a captive
+                const instance: TService = this.createInstance(descriptor, resolutionStack, true)
                 this.singletons.set(service, instance)
-                break
-            default:
-                throw new Error(`Invalid lifetime: ${descriptor.lifetime}`)
-        }
+                return instance
+            }
 
-        return instance
+            default: {
+                throw new Error(`Invalid lifetime: ${descriptor.lifetime}`)
+            }
+        }
     }
 
     public dispose(): void {
         if (this.disposed) {
             return
         }
+        this.disposed = true
 
         for (const instance of this.singletons.values()) {
             if (instance && typeof instance.dispose === "function") {
@@ -109,10 +132,7 @@ export class ServiceProvider implements IServiceProvider, IDisposable {
             }
         }
 
-        this.descriptors.clear()
         this.singletons.clear()
-        this.resolutionStack.clear()
-        this.disposed = true
     }
 
     private ensureNotDisposed(): void {
@@ -123,40 +143,35 @@ export class ServiceProvider implements IServiceProvider, IDisposable {
 
     private createInstance<TService>(
         descriptor: ServiceDescriptor<TService>,
-        scope?: IScopedServiceProvider
+        resolutionStack: Set<ServiceIdentifier>,
+        isSingletonContext: boolean,
+        scope?: IScopedServiceProvider,
     ): TService {
-        this.resolutionStack.add(descriptor.service)
-
-        try {
-            if (descriptor.factory !== undefined) {
-                return descriptor.factory(scope ?? this)
-            }
-
-            let implementation: Constructor<TService>
-            switch (true) {
-                case descriptor.implementation !== undefined:
-                    implementation = descriptor.implementation
-                    break
-                case typeof descriptor.service === "function":
-                    implementation = descriptor.service as Constructor<TService>
-                    break
-                default:
-                    throw new Error(`Invalid service type: ${typeof descriptor.service}`)
-            }
-
-            const services: ServiceIdentifier<TService>[] = this.getParameterTypes(implementation)
-            const dependencies: TService[] = services.map((service: ServiceIdentifier<TService>): TService => {
-                return this.resolve(service, scope)
-            })
-
-            return new implementation(...dependencies)
-        } finally {
-            this.resolutionStack.delete(descriptor.service)
+        if (descriptor.factory !== undefined) {
+            return descriptor.factory(scope ?? this)
         }
+
+        const currentStack = new Set([...resolutionStack, descriptor.service])
+
+        let implementation: Constructor<TService>
+        if (descriptor.implementation !== undefined) {
+            implementation = descriptor.implementation
+        } else if (typeof descriptor.service === "function") {
+            implementation = descriptor.service as Constructor<TService>
+        } else {
+            throw new Error(`No implementation found for: ${String(descriptor.service)}`)
+        }
+
+        const paramTypes: ServiceIdentifier<TService>[] = this.getParameterTypes(implementation)
+        const dependencies: TService[] = paramTypes.map((service: ServiceIdentifier<TService>) =>
+            this.resolveInternal(service, currentStack, isSingletonContext, scope)
+        )
+
+        return new implementation(...dependencies)
     }
 
     private getParameterTypes<TService>(implementation: Constructor<TService>): ServiceIdentifier<TService>[] {
-        const cached = this.paramCache.get(implementation);
+        const cached: ServiceIdentifier[] | undefined = this.paramCache.get(implementation);
         if (cached) {
             return cached
         }
@@ -167,14 +182,21 @@ export class ServiceProvider implements IServiceProvider, IDisposable {
             return types
         }
 
+        const overrides: ServiceIdentifier[] = (implementation as any).$injectOverrides ?? []
         let params: ServiceIdentifier[] = []
+        
         const reflection = ReflectionClass.from<TService>(implementation)
         if (reflection.hasMethod("constructor")) {
             reflection.getPropertiesDeclaredInConstructor()
-                .map(param => param
-                    .getResolvedReflectionClass()
-                    .getClassType() as ServiceIdentifier<TService>)
-                .forEach(param => params.push(param))
+                .forEach((param, index) => {
+                    if (overrides[index] !== undefined) {
+                        params[index] = overrides[index]
+                    } else {
+                        params[index] = param
+                            .getResolvedReflectionClass()
+                            .getClassType() as ServiceIdentifier
+                    }
+                })
         }
         if (params.length === 0 && implementation.length > 0) {
             throw new NoMetadataFoundError(
@@ -188,22 +210,26 @@ export class ServiceProvider implements IServiceProvider, IDisposable {
     }
 }
 
-export class ScopedServiceProvider implements IScopedServiceProvider, IDisposable {
-    private readonly provider: IServiceProvider
+export class ScopedServiceProvider implements IScopedServiceProvider {
+    private readonly provider: ServiceProvider
     private readonly scopes: Map<ServiceIdentifier, any>
     private disposed: boolean
 
-    public constructor(provider: IServiceProvider) {
+    public constructor(provider: ServiceProvider) {
         this.provider = provider
-        this.scopes = new Map<ServiceIdentifier, any>()
+        this.scopes = new Map()
         this.disposed = false
+    }
+
+    public createScope(): IScopedServiceProvider {
+        throw new Error("Cannot create scope from scoped service provider")
     }
 
     public isDisposed(): boolean {
         return this.disposed
     }
 
-    public resolve<TService = any>(service: ServiceIdentifier<TService>, _?: IServiceProvider): TService {
+    public resolve<TService>(service: ServiceIdentifier<TService>): TService {
         this.ensureNotDisposed()
         return this.provider.resolve(service, this)
     }
@@ -214,10 +240,11 @@ export class ScopedServiceProvider implements IScopedServiceProvider, IDisposabl
         }
 
         for (const instance of this.scopes.values()) {
-            if (instance && typeof instance.dispose === 'function') {
+            if (instance && typeof instance.dispose === "function") {
                 instance.dispose()
             }
         }
+
         this.scopes.clear()
         this.disposed = true
     }
@@ -232,20 +259,22 @@ export class ScopedServiceProvider implements IScopedServiceProvider, IDisposabl
             return this.scopes.get(service) as TService
         }
 
+        const temporaryScope = new ScopedServiceProvider(this.provider)
         let instance: TService
 
-        // Use a temporary scope to isolate failures during creation
-        const temporaryScope = new ScopedServiceProvider(this.provider)
         try {
             instance = factory(temporaryScope)
         } catch (error) {
+            // Dispose partial dependencies resolved during the failed attempt
             temporaryScope.dispose()
             throw error
         }
 
-        // Transfer successfully created dependencies from tempScope to this scope
+        // Transfer successfully created dependencies into this scope
         for (const [key, value] of temporaryScope.scopes.entries()) {
-            this.scopes.set(key, value)
+            if (!this.scopes.has(key)) {
+                this.scopes.set(key, value)
+            }
         }
 
         this.scopes.set(service, instance)

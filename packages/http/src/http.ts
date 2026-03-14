@@ -1,73 +1,123 @@
-import { Router } from "./router"
-import type { HttpHandler, IHttpMiddleware, MayBePromise } from "./types"
+import type {
+    HttpContext,
+    HttpErrorHandler,
+    HttpHandler,
+    IHttpApplication,
+    IHttpMiddleware,
+    IHttpRouter,
+    MayBePromise
+} from "./types"
+import { HttpRouter } from "./router"
+import { type IServiceProvider } from "@shared/ioc"
+import { type ILogger, Logger } from "@shared/logging"
 
-export class Http {
-    private readonly router: Router
+export class HttpApplication implements IHttpApplication {
+    private readonly router: IHttpRouter
+    private readonly provider: IServiceProvider
     private readonly middlewares: IHttpMiddleware[]
+    private errorHandler: HttpErrorHandler
+    private server: Bun.Server<undefined> | null
+    private readonly logger: ILogger
 
-    public constructor(router?: Router) {
-        this.router = router ?? new Router()
+    public constructor(provider: IServiceProvider, router?: HttpRouter, logger?: ILogger) {
+        this.provider = provider
+        this.router = router ?? new HttpRouter()
         this.middlewares = []
+        this.server = null
+        this.errorHandler = (error: unknown): Response => {
+            const message = error instanceof Error ? error.message : "Internal Server Error"
+            return Response.json({ error: message }, { status: 500 })
+        }
+        this.logger = logger ?? new Logger("Http")
     }
 
-    public use(middleware: IHttpMiddleware): Http {
-        this.middlewares.push(middleware)
-        return this
-    }
-
-    public async applyMiddlewares(request: Request, final: HttpHandler): Promise<Response> {
+    private async applyMiddlewares(context: HttpContext, final: HttpHandler): Promise<Response> {
         const middlewares = this.middlewares
 
-        async function dispatch(request: Request, index: number): Promise<Response> {
+        async function dispatch(index: number): Promise<Response> {
             const middleware = middlewares[index]
             if (middleware === undefined) {
-                return final(request)
+                return Promise.resolve(final(context))
             }
 
-            return middleware.apply(request, (nextRequest: Request): MayBePromise<Response> => dispatch(nextRequest, index + 1))
+            return Promise.resolve(
+                middleware.apply(context, (): MayBePromise<Response> => dispatch(index + 1))
+            )
         }
 
-        return dispatch(request, 0)
+        return dispatch(0)
     }
 
     public listen(port?: number): void {
         const self = this
 
-        const server = Bun.serve({
-            port: port ?? Bun.env.PORT ?? 3000,
+        this.server = Bun.serve({
+            port: port,
             async fetch(request: Request): Promise<Response> {
-                return self.applyMiddlewares(request, self.router.handle)
-            },
-            async error(error: Error): Promise<Response> {
-                const message = error.message || "Internal Server Error"
-                return Response.json({ error: message }, { status: 500 })
+                const scope = self.provider.createScope()
+                const context: HttpContext = { request, params: {}, scope }
+
+                try {
+                    return await self.applyMiddlewares(
+                        context,
+                        (ctx: HttpContext): MayBePromise<Response> => self.router.handle(ctx.request, ctx.scope)
+                    )
+                } catch (error) {
+                    return self.errorHandler(error, context)
+                } finally {
+                    scope.dispose()
+                }
             }
         })
 
-        console.log(`Listening on ${server.url}`)
+        this.logger.info(`Listening on ${this.server.url}`)
     }
 
-    public get(pathname: string, handler: HttpHandler): Http {
+    public shutdown(): void {
+        if (this.server === null) {
+            throw new Error("Server is not running.")
+        }
+
+        this.server.stop()
+        this.server = null
+    }
+
+    public use(middleware: IHttpMiddleware): IHttpApplication {
+        this.middlewares.push(middleware)
+        return this
+    }
+
+    public mount(prefix: string, router: IHttpRouter): IHttpApplication {
+        this.router.mount(prefix, router)
+        return this
+    }
+
+    public onError(handler: HttpErrorHandler): IHttpApplication {
+        this.errorHandler = handler
+        return this
+    }
+
+    public get(pathname: string, handler: HttpHandler): IHttpApplication {
         this.router.get(pathname, handler)
         return this
     }
 
-    public post(pathname: string, handler: HttpHandler): Http {
+    public post(pathname: string, handler: HttpHandler): IHttpApplication {
         this.router.post(pathname, handler)
         return this
     }
 
-    public put(pathname: string, handler: HttpHandler): Http {
+    public put(pathname: string, handler: HttpHandler): IHttpApplication {
         this.router.put(pathname, handler)
         return this
     }
 
-    public patch(pathname: string, handler: HttpHandler): Http {
+    public patch(pathname: string, handler: HttpHandler): IHttpApplication {
         this.router.patch(pathname, handler)
         return this
     }
 
-    public delete(pathname: string, handler: HttpHandler): Http {
+    public delete(pathname: string, handler: HttpHandler): IHttpApplication {
         this.router.delete(pathname, handler)
         return this
     }

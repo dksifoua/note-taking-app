@@ -4,3 +4,6 @@ export class RequiredScopedServiceProviderError extends Error {}
 export class NoMetadataFoundError extends Error {}
 export class CircularDependencyError extends Error {}
 export class ServiceDisposedError extends Error {}
+export class CaptiveDependencyError extends Error {}
+export class NoImplementationProvidedError extends Error {}
+export class ServiceAlreadyRegisteredError extends Error {}

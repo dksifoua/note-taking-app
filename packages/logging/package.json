@@ -1,15 +1,11 @@
 {
-    "name": "@shared/ioc",
-    "type": "module",
+    "name": "@shared/logging",
     "module": "src/index.ts",
+    "type": "module",
     "exports": {
         ".": {
             "import": "./src/index.ts"
         }
-    },
-    "dependencies": {
-        "@deepkit/bun": "^1.0.19",
-        "@deepkit/type": "^1.0.19"
     },
     "devDependencies": {
         "@types/bun": "latest"

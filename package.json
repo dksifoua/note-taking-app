@@ -5,8 +5,8 @@
     "private": true,
     "workspaces": ["apps/*", "packages/*"],
     "scripts": {
-        "api:dev": "cd apps/api && bun run dev",
-        "ui:dev": "cd apps/ui && bun run dev",
+        "api:dev": "bun run --filter note-taking-api --env-file=.env.api.local dev",
+        "ui:dev": "bun run --filter note-taking-ui dev",
         "dev": "concurrently -n 'api,ui' -c 'green,blue' 'bun run api:dev' 'bun run ui:dev'"
     },
     "devDependencies": {

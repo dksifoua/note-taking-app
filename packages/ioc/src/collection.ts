@@ -1,5 +1,13 @@
-import type { Constructor, ServiceDescriptor, ServiceFactory, ServiceIdentifier, ServiceLifetime } from "./types"
+import type {
+    Constructor,
+    IServiceProvider,
+    ServiceDescriptor,
+    ServiceFactory,
+    ServiceIdentifier,
+    ServiceLifetime
+} from "./types"
 import { ServiceProvider } from "./provider"
+import { NoImplementationProvidedError, ServiceAlreadyRegisteredError } from "./error"
 
 export class ServiceCollection {
     private readonly descriptors: Array<ServiceDescriptor>
@@ -14,8 +22,13 @@ export class ServiceCollection {
         implementation?: Constructor<TImplementation>,
     ): void {
         if (typeof service !== "function" && !implementation) {
-            throw new Error(`Service ${String(service)} must be a constructor when no implementation is provided.`)
+            throw new NoImplementationProvidedError(`Service ${String(service)} must be a constructor when no implementation is provided.`)
         }
+
+        if (this.descriptors.some((descriptor: ServiceDescriptor): boolean => descriptor.service === service)) {
+            throw new ServiceAlreadyRegisteredError(`Service ${String(service)} is already registered.`)
+        }
+        
         this.descriptors.push({ service, implementation, lifetime })
     }
 
@@ -24,6 +37,10 @@ export class ServiceCollection {
         lifetime: ServiceLifetime,
         factory: ServiceFactory<TService>,
     ): void {
+        if (this.descriptors.some((descriptor: ServiceDescriptor): boolean => descriptor.service === service)) {
+            throw new ServiceAlreadyRegisteredError(`Service ${String(service)} is already registered.`)
+        }
+        
         this.descriptors.push({ service, factory, lifetime })
     }
 
@@ -31,6 +48,10 @@ export class ServiceCollection {
         service: ServiceIdentifier<TService>,
         instance: TService,
     ): void {
+        if (this.descriptors.some((descriptor: ServiceDescriptor): boolean => descriptor.service === service)) {
+            throw new ServiceAlreadyRegisteredError(`Service ${String(service)} is already registered.`)
+        }
+        
         this.descriptors.push({ service, instance, lifetime: "singleton" })
     }
 
@@ -83,7 +104,7 @@ export class ServiceCollection {
         this.addInstance(service, instance)
     }
 
-    public build(): ServiceProvider {
+    public build(): IServiceProvider {
         return new ServiceProvider([...this.descriptors])
     }
 }

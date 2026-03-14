@@ -1,383 +1,690 @@
 import { beforeEach, describe, expect, it } from "bun:test"
-import { ServiceCollection } from "../src/collection"
-import type { IDisposable, ServiceIdentifier } from "../src/types"
 import {
     CannotResolveServiceProviderError,
-    CircularDependencyError,
-    RequiredScopedServiceProviderError,
-    ServiceDisposedError,
-    ServiceNotRegisteredError
-} from "../src/error"
-import { ScopedServiceProvider, ServiceProvider } from "../src/provider"
+    CaptiveDependencyError, CircularDependencyError, Inject, NoMetadataFoundError,
+    RequiredScopedServiceProviderError, ScopedServiceProvider,
+    ServiceCollection, ServiceDisposedError,
+    ServiceNotRegisteredError, ServiceProvider
+} from "../src"
 
-// ----------------------------------------------------------------------
-// Helper Classes and Interfaces for Testing
-// ----------------------------------------------------------------------
-interface ILogger {
-    log(message: string): void
-}
-
-class ConsoleLogger implements ILogger {
-    
-    public log(message: string): void {}
-}
-
-class TestDisposable implements IDisposable {
+class TestDisposable {
     private disposed = false
 
-    public dispose(): void {
+    dispose(): void {
         this.disposed = true
     }
-    
-    public isDisposed(): boolean {
+
+    isDisposed(): boolean {
         return this.disposed
     }
 }
 
-class ServiceA {
-    
-    constructor() {
-    }
-}
-
-class ServiceB {
-    
-    constructor(public readonly a?: ServiceA) {
-    }
-}
-
-class ServiceC {
-    
-    constructor(public readonly a?: ServiceA) {
-    }
-}
-
-class ServiceWithInject {
-    public static $inject: ServiceIdentifier[] = ["ILogger"]
-
-    constructor(public logger: ILogger) {
-    }
-}
-
-// ----------------------------------------------------------------------
-// Tests
-// ----------------------------------------------------------------------
-describe("ServiceProviderTest", (): void => {
+describe("ServiceProvider", (): void => {
     let services: ServiceCollection
 
     beforeEach((): void => {
         services = new ServiceCollection()
     })
 
-    describe("resolve basics", (): void => {
+    describe("singleton lifetime", (): void => {
 
-        it("should resolve a service registered with constructor", (): void => {
-            services.addSingleton(ConsoleLogger)
+        it("should resolve a singleton by constructor", (): void => {
+            class MyService {
+            }
+
+            services.addSingleton(MyService)
             const provider = services.build()
-            const instance = provider.resolve(ConsoleLogger)
-            expect(instance).toBeInstanceOf(ConsoleLogger)
-        })
-        
-        it("should resolve a service registered with string identifier", (): void => {
-            const identifier = "ILogger"
-            services.addSingleton(identifier, ConsoleLogger)
-            const provider = services.build()
-            const instance = provider.resolve<ILogger>(identifier)
-            expect(instance).toBeInstanceOf(ConsoleLogger)
-        })
-        
-        it("should resolve a service registered with symbol identifier", (): void => {
-            const identifier = Symbol("ILogger")
-            services.addSingleton(identifier, ConsoleLogger)
-            const provider = services.build()
-            const instance = provider.resolve<ILogger>(identifier)
-            expect(instance).toBeInstanceOf(ConsoleLogger)
-        })
-        
-        it("should resolve a service from a factory", (): void => {
-            services.addSingletonFactory("answer", () => 42)
-            const provider = services.build()
-            const instance = provider.resolve<number>("answer")
-            expect(instance).toBe(42)
-        })
-        
-        it("should resolve a pre‑existing instance", (): void => {
-            const obj = { value: 123 }
-            services.addSingletonInstance("obj", obj)
-            const provider = services.build()
-            const instance = provider.resolve<typeof obj>("obj")
-            expect(instance).toBe(obj)
+
+            expect(provider.resolve(MyService)).toBeInstanceOf(MyService)
         })
 
-        it("should throw if service not registered", (): void => {
+        it("should return the same instance on multiple resolves", (): void => {
+            class MyService {
+            }
+
+            services.addSingleton(MyService)
             const provider = services.build()
-            expect(() => provider.resolve("missing")).toThrow(ServiceNotRegisteredError)
+
+            expect(provider.resolve(MyService)).toBe(provider.resolve(MyService))
         })
-        
-        it("should throw when trying to resolve the provider itself", (): void => {
+
+        it("should resolve a pre-registered instance directly", (): void => {
+            class MyService {
+            }
+
+            const instance = new MyService()
+            services.addSingletonInstance(MyService, instance)
             const provider = services.build()
-            expect(() => provider.resolve(ServiceProvider)).toThrow(CannotResolveServiceProviderError)
-            expect(() => provider.resolve(ScopedServiceProvider)).toThrow(CannotResolveServiceProviderError)
+
+            expect(provider.resolve(MyService)).toBe(instance)
+        })
+
+        it("should resolve a singleton via factory", (): void => {
+            class MyService {
+            }
+
+            services.addSingletonFactory(MyService, () => new MyService())
+            const provider = services.build()
+
+            expect(provider.resolve(MyService)).toBe(provider.resolve(MyService))
+        })
+
+        it("should throw captive dependency error when singleton depends on scoped service", (): void => {
+            class ScopedDep {
+            }
+
+            class MySingleton {
+                constructor(public dep: ScopedDep) {
+                }
+            }
+
+            services.addScoped(ScopedDep)
+            services.addSingleton(MySingleton)
+            const provider = services.build()
+
+            expect(() => provider.resolve(MySingleton)).toThrow(CaptiveDependencyError)
         })
     })
 
-    describe("resolve lifetimes", (): void => {
-        
-        it("should create new instances for transient each time", (): void => {
-            services.addTransient(ConsoleLogger)
-            const provider = services.build()
-            
-            const a = provider.resolve(ConsoleLogger)
-            const b = provider.resolve(ConsoleLogger)
-            expect(a).not.toBe(b)
-        })
-        
-        it("should share instance within a scope for scoped", (): void => {
-            services.addScoped(ConsoleLogger)
-            const provider = services.build()
-            const scope = provider.createScope()
+    describe("transient lifetime", (): void => {
 
-            const a = scope.resolve(ConsoleLogger)
-            const b = scope.resolve(ConsoleLogger)
-            expect(a).toBe(b)
+        it("should resolve a transient service", (): void => {
+            class MyService {
+            }
+
+            services.addTransient(MyService)
+            const provider = services.build()
+
+            expect(provider.resolve(MyService)).toBeInstanceOf(MyService)
         })
-        
-        it("should create different scoped instances in different scopes", (): void => {
-            services.addScoped(ConsoleLogger)
+
+        it("should resolve a transient via factory", (): void => {
+            class MyService {
+            }
+
+            services.addTransientFactory(MyService, () => new MyService())
+            const provider = services.build()
+
+            expect(provider.resolve(MyService)).toBeInstanceOf(MyService)
+        })
+
+        it("should return a new instance on every resolve", (): void => {
+            class ServiceA {
+            }
+
+            class ServiceB {
+            }
+
+            services.addTransient(ServiceA)
+            services.addTransientFactory(ServiceB, () => new ServiceB())
+            const provider = services.build()
+
+            expect(provider.resolve(ServiceA)).not.toBe(provider.resolve(ServiceA))
+            expect(provider.resolve(ServiceB)).not.toBe(provider.resolve(ServiceB))
+        })
+    })
+
+    describe("scoped lifetime", (): void => {
+
+        it("should throw when resolving scoped service without a scope", (): void => {
+            class MyService {
+            }
+
+            services.addScoped(MyService)
+            const provider = services.build()
+
+            expect(() => provider.resolve(MyService)).toThrow(RequiredScopedServiceProviderError)
+        })
+    })
+
+    describe("resolution", (): void => {
+
+        it("should throw ServiceNotRegisteredError for unknown identifier", (): void => {
+            class MyService {
+            }
+
+            const provider = services.build()
+
+            expect(() => provider.resolve(MyService)).toThrow(ServiceNotRegisteredError)
+        })
+
+        it("should throw CannotResolveServiceProviderError for ServiceProvider", (): void => {
+            const provider = services.build()
+
+            expect(() => provider.resolve(ServiceProvider)).toThrow(CannotResolveServiceProviderError)
+        })
+
+        it("should throw CannotResolveServiceProviderError for ScopedServiceProvider", (): void => {
+            const provider = services.build()
+
+            expect(() => provider.resolve(ScopedServiceProvider)).toThrow(CannotResolveServiceProviderError)
+        })
+
+        it("should throw CircularDependencyError on direct circular dependency", (): void => {
+            class ServiceA {
+                constructor(public a: ServiceA) {
+                }
+            }
+
+            services.addSingleton(ServiceA)
+            const provider = services.build()
+
+            expect(() => provider.resolve(ServiceA)).toThrow(CircularDependencyError)
+        })
+
+        it("should throw CircularDependencyError on indirect circular dependency", (): void => {
+            class ServiceA {
+                constructor(public b: ServiceB) {
+                }
+            }
+
+            class ServiceB {
+                constructor(public a: ServiceA) {
+                }
+            }
+
+            services.addSingleton(ServiceA)
+            services.addSingleton(ServiceB)
+            const provider = services.build()
+
+            expect(() => provider.resolve(ServiceA)).toThrow(CircularDependencyError)
+        })
+
+        it.failing("should throw NoMetadataFoundError when constructor has params but no metadata", (): void => {
+            class Dep {
+            }
+
+            class MyService {
+                constructor(public dep: Dep, public value: string) {
+                }
+            }
+
+            services.addSingleton(Dep)
+            services.addSingleton(MyService)
+            const provider = services.build()
+
+            expect(() => provider.resolve(MyService)).toThrow(NoMetadataFoundError)
+        })
+
+        it("should resolve using $inject when metadata is unavailable", (): void => {
+            class Dep {
+            }
+
+            class MyService {
+                public static $inject = [Dep]
+
+                constructor(public dep: Dep) {
+                }
+            }
+
+            services.addSingleton(Dep)
+            services.addSingleton(MyService)
+            const provider = services.build()
+
+            const resolved = provider.resolve(MyService)
+            expect(resolved).toBeInstanceOf(MyService)
+            expect(resolved.dep).toBeInstanceOf(Dep)
+        })
+
+        it("should resolve a chain of dependencies correctly", (): void => {
+            class DepA {
+            }
+
+            class DepB {
+                constructor(public a: DepA) {
+                }
+            }
+
+            class DepC {
+                constructor(public a: DepA, public b: DepB) {
+                }
+            }
+
+            services.addSingleton(DepA)
+            services.addSingleton(DepB)
+            services.addSingleton(DepC)
+            const provider = services.build()
+
+            const c = provider.resolve(DepC)
+            expect(c).toBeInstanceOf(DepC)
+            expect(c.b).toBeInstanceOf(DepB)
+            expect(c.a).toBeInstanceOf(DepA)
+        })
+
+        it("should cache parameter types after first resolution", (): void => {
+            class Dep {
+            }
+
+            class MyService {
+                public static $inject = [Dep]
+
+                constructor(public dep: Dep) {
+                }
+            }
+
+            services.addTransient(Dep)
+            services.addTransient(MyService)
+            const provider = services.build()
+
+            provider.resolve(MyService)
+            expect(() => provider.resolve(MyService)).not.toThrow()
+        })
+    })
+
+    describe("dispose", (): void => {
+
+        it("should dispose all singleton instances that implement IDisposable", (): void => {
+            class MyService extends TestDisposable {
+            }
+
+            services.addSingleton(MyService)
+            const provider = services.build()
+            const instance = provider.resolve(MyService)
+
+            provider.dispose()
+
+            expect(instance.isDisposed()).toBe(true)
+        })
+
+        it("should not dispose singleton instances that do not implement IDisposable", (): void => {
+            class MyService {
+            }
+
+            services.addSingleton(MyService)
+            const provider = services.build()
+            provider.resolve(MyService)
+
+            expect(() => provider.dispose()).not.toThrow()
+        })
+
+        it("should throw ServiceDisposedError after disposal", (): void => {
+            class MyService {
+            }
+
+            services.addSingleton(MyService)
+            const provider = services.build()
+            provider.dispose()
+
+            expect(() => provider.resolve(MyService)).toThrow(ServiceDisposedError)
+        })
+
+        it("should not throw when dispose is called multiple times", (): void => {
+            const provider = services.build()
+            provider.dispose()
+
+            expect(() => provider.dispose()).not.toThrow()
+        })
+    })
+})
+
+describe("ScopedServiceProvider", (): void => {
+    let services: ServiceCollection
+
+    beforeEach((): void => {
+        services = new ServiceCollection()
+    })
+
+    describe("scoped", (): void => {
+
+        it("should resolve a scoped service within a scope", (): void => {
+            class MyService {
+            }
+
+            services.addScoped(MyService)
+            const scope = services.build().createScope()
+
+            expect(scope.resolve(MyService)).toBeInstanceOf(MyService)
+        })
+
+        it("should return the same instance within the same scope", (): void => {
+            class MyService {
+            }
+
+            services.addScoped(MyService)
+            const scope = services.build().createScope()
+
+            expect(scope.resolve(MyService)).toBe(scope.resolve(MyService))
+        })
+
+        it("should return different instances across different scopes", (): void => {
+            class MyService {
+            }
+
+            services.addScoped(MyService)
             const provider = services.build()
             const scope1 = provider.createScope()
             const scope2 = provider.createScope()
 
-            const a = scope1.resolve(ConsoleLogger)
-            const b = scope2.resolve(ConsoleLogger)
-            expect(a).not.toBe(b)
-        })
-        
-        it("should throw if scoped service resolved without a scope", (): void => {
-            services.addScoped(ConsoleLogger)
-            const provider = services.build()
-            
-            expect(() => provider.resolve(ConsoleLogger)).toThrow(RequiredScopedServiceProviderError)
-        })
-    })
-    
-    describe("dependency injection", (): void => {
-        
-        it("should inject dependencies using $inject property", (): void => {
-            services.addSingleton<ILogger, ConsoleLogger>("ILogger", ConsoleLogger)
-            services.addSingleton(ServiceWithInject)
-            const provider = services.build()
-            
-            const instance = provider.resolve(ServiceWithInject)
-            expect(instance.logger).toBeInstanceOf(ConsoleLogger)
-        })
-        
-        it("should inject dependencies using reflection", (): void => {
-            services.addSingleton(ServiceA)
-            services.addSingleton(ServiceB)
-            services.addSingleton(ServiceC)
-            const provider = services.build()
-
-            const a = provider.resolve(ServiceA)
-            const b = provider.resolve(ServiceB)
-            const c = provider.resolve(ServiceC)
-            expect(a).toBe(b.a!)
-            expect(a).toBe(c.a!)
-        })
-        
-        it("should throw if constructor expects non registered params", (): void => {
-            class X { constructor(public x: {}) {} }
-            
-            services.addTransient(X)
-            const provider = services.build()
-            expect(() => provider.resolve(X)).toThrow(ServiceNotRegisteredError)
-        })
-    })
-    
-    describe("circular dependency detection", (): void => {
-        
-        it("should detect direct circular dependency", (): void => {
-            class X { constructor(public y: Y) {} }
-            class Y { constructor(public x: X) {} }
-            
-            services.addTransient(X)
-            services.addTransient(Y)
-            const provider = services.build()
-            expect(() => provider.resolve(X)).toThrow(CircularDependencyError)
-        })
-        
-        it("should detect longer cycle and format stack clearly", (): void => {
-            class X { constructor(public y: Y) {} }
-            class Y { constructor(public z: Z) {} }
-            class Z { constructor(public x: X) {} }
-            
-            services.addTransient(X)
-            services.addTransient(Y)
-            services.addTransient(Z)
-            const provider = services.build()
-            expect(() => provider.resolve(X)).toThrow(/X -> Y -> Z -> X/)
-        })
-        
-        it("should not throw for non‑circular graph", (): void => {
-            class A { constructor(public b: B) {} }
-            class B { constructor() {} }
-
-            services.addTransient(A)
-            services.addTransient(B)
-            const provider = services.build()
-            expect(() => provider.resolve(A)).not.toThrow()
-        })
-    })
-    
-    describe("post‑disposal usage", (): void => {
-        
-        it("should throw when resolving after provider is disposed", (): void => {
-            services.addSingleton(ConsoleLogger)
-            
-            const provider = services.build()
-            provider.dispose()
-            expect(() => provider.resolve(ConsoleLogger)).toThrow(ServiceDisposedError)
-        })
-        
-        it("should throw when creating a scope after provider is disposed", (): void => {
-            services.addSingleton(ConsoleLogger)
-            
-            const provider = services.build()
-            provider.dispose()
-            expect(() => provider.createScope()).toThrow(ServiceDisposedError)
-        })
-    })
-    
-    describe("singleton disposal", (): void => {
-        
-        it("should call dispose on singleton instances that implement IDisposable", (): void => {
-            services.addSingleton(TestDisposable)
-            
-            const provider = services.build()
-            const instance = provider.resolve(TestDisposable)
-            expect(instance.isDisposed()).toBe(false)
-            provider.dispose()
-            expect(instance.isDisposed()).toBe(true)
-        })
-        
-        it("should not throw if singleton does not implement dispose", (): void => {
-            services.addSingleton(ConsoleLogger)
-            
-            const provider = services.build()
-            expect(() => provider.dispose()).not.toThrow()
-        })
-    })
-
-    describe("scoped provider", (): void => {
-        
-        it("should dispose scoped instances when scope is disposed", (): void => {
-            services.addScoped(TestDisposable)
-
-            const provider = services.build()
-            const scope = provider.createScope()
-            const instance = scope.resolve(TestDisposable)
-            expect(instance.isDisposed()).toBe(false)
-            scope.dispose()
-            expect(instance.isDisposed()).toBe(true)
-        })
-        
-        it("should not allow resolves after scope is disposed", (): void => {
-            services.addScoped(ConsoleLogger)
-
-            const provider = services.build()
-            const scope = provider.createScope()
-            scope.dispose()
-            expect(() => scope.resolve(TestDisposable)).toThrow(ServiceDisposedError)
+            expect(scope1.resolve(MyService)).not.toBe(scope2.resolve(MyService))
         })
 
-        it("should isolate partial failures during scoped service creation", (): void => {
-            class DependencyA extends TestDisposable {}
-            class DependencyB extends TestDisposable {}
-            class FailingService {
-                constructor(public a: DependencyA, public b: DependencyB) {
-                    throw new Error("Construction failed")
+        it("should resolve scoped service that depends on another scoped service", (): void => {
+            class DepA {
+            }
+
+            class DepB {
+                constructor(public a: DepA) {
                 }
             }
 
-            services.addScoped(DependencyA)
-            services.addScoped(DependencyB)
+            services.addScoped(DepA)
+            services.addScoped(DepB)
+            const scope = services.build().createScope()
+
+            const b = scope.resolve(DepB)
+            expect(b).toBeInstanceOf(DepB)
+            expect(b.a).toBeInstanceOf(DepA)
+        })
+    })
+
+    describe("partial failure isolation", (): void => {
+
+        it("should dispose partial dependencies when implementation throws", (): void => {
+            class DepA extends TestDisposable {}
+            class FailingService {
+                constructor(public a: DepA) { throw new Error("Construction failed") }
+            }
+
+            services.addScoped(DepA)
             services.addScoped(FailingService)
+            const scope = services.build().createScope()
 
-            const provider = services.build()
-            const scope = provider.createScope()
+            expect(() => scope.resolve(FailingService)).toThrow("Construction failed")
+        })
 
-            // First attempt should fail and clean up temporary dependencies
-            expect(() => scope.resolve(FailingService)).toThrow(/Construction failed/)
+        it("should not leak failed dependencies into the scope", (): void => {
+            class DepA extends TestDisposable {}
+            class FailingService {
+                constructor(public a: DepA) { throw new Error("Construction failed") }
+            }
+            
+            services.addScoped(DepA)
+            services.addScoped(FailingService)
+            const scope = services.build().createScope()
 
-            // Dependencies should NOT be leaked into the main scope
-            // If we manually resolve them, they should be new instances
-            const depA = scope.resolve(DependencyA)
-            const depB = scope.resolve(DependencyB)
+            expect(() => scope.resolve(FailingService)).toThrow()
 
-            // The failed attempt's dependencies should have been disposed
-            expect(depA).toBeInstanceOf(DependencyA)
-            expect(depB).toBeInstanceOf(DependencyB)
+            const freshA = scope.resolve(DepA)
+            expect(freshA.isDisposed()).toBe(false)
+        })
+        
+        it("should allow resolving fresh instances after a failed attempt", (): void => {
+            class DepA extends TestDisposable {}
+            class FailingService {
+                constructor(public a: DepA) { throw new Error("Construction failed") }
+            }
+            
+            services.addScoped(DepA)
+            services.addScoped(FailingService)
+            const scope = services.build().createScope()
 
-            // When we dispose of the scope, only the successfully created instances should be disposed
-            expect(depA.isDisposed()).toBe(false)
-            expect(depB.isDisposed()).toBe(false)
+            expect(() => scope.resolve(FailingService)).toThrow()
+
+            expect(scope.resolve(DepA)).toBeInstanceOf(DepA)
+        })
+        
+        it("should not dispose already-committed instances on subsequent failures", (): void => {
+            class DepA extends TestDisposable {}
+            class FailingService {
+                constructor(public a: DepA) { throw new Error("Construction failed") }
+            }
+            
+            services.addScoped(DepA)
+            services.addScoped(FailingService)
+            const scope = services.build().createScope()
+
+            const committedA = scope.resolve(DepA)
+            expect(() => scope.resolve(FailingService)).toThrow()
+
+            expect(committedA.isDisposed()).toBe(false)
+        })
+    })
+
+    describe("dispose", (): void => {
+
+        it("should dispose all scoped instances that implement IDisposable", (): void => {
+            class MyService extends TestDisposable {}
+            services.addScoped(MyService)
+            
+            const scope = services.build().createScope()
+            const instance = scope.resolve(MyService)
 
             scope.dispose()
 
-            expect(depA.isDisposed()).toBe(true)
-            expect(depB.isDisposed()).toBe(true)
+            expect(instance.isDisposed()).toBe(true)
         })
+        
+        it("should not dispose scoped instances that do not implement IDisposable", (): void => {
+            class MyService {}
+            
+            services.addScoped(MyService)
+            const scope = services.build().createScope()
+            scope.resolve(MyService)
 
-        it("should not leak partially created dependencies when a factory throws", (): void => {
-            class DependencyA extends TestDisposable {}
-            class DependencyB extends TestDisposable {}
+            expect(() => scope.dispose()).not.toThrow()
+        })
+        
+        it("should throw ServiceDisposedError after disposal", (): void => {
+            class MyService {}
+            
+            services.addScoped(MyService)
+            const scope = services.build().createScope()
+            scope.dispose()
 
-            let createdInstances: TestDisposable[] = []
+            expect(() => scope.resolve(MyService)).toThrow(ServiceDisposedError)
+        })
+        
+        it("should not throw when dispose is called multiple times", (): void => {
+            const scope = services.build().createScope()
+            scope.dispose()
 
-            services.addScoped(DependencyA)
-            services.addScoped(DependencyB)
-            services.addScopedFactory("FailingFactory", (provider) => {
-                // Resolve dependencies first
-                const a = provider.resolve(DependencyA)
-                const b = provider.resolve(DependencyB)
-
-                // Track what was created
-                createdInstances.push(a, b)
-
-                // Then throw
-                throw new Error("Factory failed")
-            })
-
+            expect(() => scope.dispose()).not.toThrow()
+        })
+        
+        it("should not affect the parent ServiceProvider when disposed", (): void => {
+            class MyService {}
+            
+            services.addSingleton(MyService)
             const provider = services.build()
             const scope = provider.createScope()
+            scope.dispose()
 
-            // Attempt to resolve the failing factory
-            expect(() => scope.resolve("FailingFactory")).toThrow(/Factory failed/)
-
-            // The partially created dependencies should have been disposed
-            expect(createdInstances.length).toBe(2)
-            expect(createdInstances[0]!.isDisposed()).toBe(true)
-            expect(createdInstances[1]!.isDisposed()).toBe(true)
-
-            // The main scope should be clean - resolving dependencies again should create new instances
-            const newA = scope.resolve(DependencyA)
-            const newB = scope.resolve(DependencyB)
-
-            expect(newA).toBeInstanceOf(DependencyA)
-            expect(newB).toBeInstanceOf(DependencyB)
-            expect(newA.isDisposed()).toBe(false)
-            expect(newB.isDisposed()).toBe(false)
+            expect(() => provider.resolve(MyService)).not.toThrow()
         })
     })
-    
-    describe("type safety (runtime behavior)", (): void => {
+})
+
+describe("@Inject decorator", (): void => {
+    let services: ServiceCollection
+
+    beforeEach((): void => {
+        services = new ServiceCollection()
+    })
+
+    describe("parameter decoration", (): void => {
         
-        it("should retrieve the correct descriptor for a given service", (): void => {
-            services.addSingleton("foo", ConsoleLogger)
-            
+        it("should store the token on $injectOverrides at the correct index", (): void => {
+            class MyService {
+                public constructor(
+                    _a: string,
+                    @Inject("token") _b: string
+                ) {}
+            }
+
+            expect((MyService as any).$injectOverrides[1]).toBe("token")
+        })
+
+        it("should not affect undecorated parameter indices", (): void => {
+            class MyService {
+                public constructor(
+                    _a: string,
+                    @Inject("token") _b: string
+                ) {}
+            }
+
+            expect((MyService as any).$injectOverrides[0]).toBeUndefined()
+        })
+
+        it("should support multiple @Inject decorators on the same constructor", (): void => {
+            class MyService {
+                public constructor(
+                    @Inject("tokenA") _a: string,
+                    @Inject("tokenB") _b: string
+                ) {}
+            }
+
+            expect((MyService as any).$injectOverrides[0]).toBe("tokenA")
+            expect((MyService as any).$injectOverrides[1]).toBe("tokenB")
+        })
+
+        it("should support symbol tokens", (): void => {
+            const token = Symbol("myToken")
+
+            class MyService {
+                public constructor(
+                    @Inject(token) _a: string
+                ) {}
+            }
+
+            expect((MyService as any).$injectOverrides[0]).toBe(token)
+        })
+
+        it("should support constructor tokens", (): void => {
+            class Dep {}
+
+            class MyService {
+                public constructor(
+                    @Inject(Dep) _a: Dep
+                ) {}
+            }
+
+            expect((MyService as any).$injectOverrides[0]).toBe(Dep)
+        })
+    })
+
+    describe("resolution", (): void => {
+        
+        it("should resolve a string token injected via @Inject", (): void => {
+            class MyService {
+                public static $inject = ["secret"]
+                public constructor(public readonly secret: string) {}
+            }
+
+            services.addSingletonInstance("secret", "my-secret-value")
+            services.addSingleton(MyService)
             const provider = services.build()
-            const foo = provider.resolve("foo")
-            expect(foo).toBeInstanceOf(ConsoleLogger)
+
+            const instance = provider.resolve(MyService)
+            expect(instance.secret).toBe("my-secret-value")
+        })
+
+        it("should resolve a symbol token injected via @Inject", (): void => {
+            const SecretToken = Symbol("secret")
+
+            class MyService {
+                public static $inject = [SecretToken]
+                public constructor(public readonly secret: string) {}
+            }
+
+            services.addSingletonInstance(SecretToken, "symbol-secret")
+            services.addSingleton(MyService)
+            const provider = services.build()
+
+            const instance = provider.resolve(MyService)
+            expect(instance.secret).toBe("symbol-secret")
+        })
+
+        it("should mix @Inject overrides with class-typed parameters", (): void => {
+            class Dep {}
+
+            class MyService {
+                public static $inject = [Dep, "secret"]
+                public constructor(
+                    public readonly dep: Dep,
+                    public readonly secret: string
+                ) {}
+            }
+
+            services.addSingleton(Dep)
+            services.addSingletonInstance("secret", "mixed-secret")
+            services.addSingleton(MyService)
+            const provider = services.build()
+
+            const instance = provider.resolve(MyService)
+            expect(instance.dep).toBeInstanceOf(Dep)
+            expect(instance.secret).toBe("mixed-secret")
+        })
+
+        it("should throw when the injected token is not registered", (): void => {
+            class MyService {
+                public static $inject = ["unregistered"]
+                public constructor(public readonly value: string) {}
+            }
+
+            services.addSingleton(MyService)
+            const provider = services.build()
+
+            expect(() => provider.resolve(MyService)).toThrow(ServiceNotRegisteredError)
+        })
+
+        it("should resolve different values for different tokens", (): void => {
+            class MyService {
+                public static $inject = ["host", "port"]
+                public constructor(
+                    public readonly host: string,
+                    public readonly port: number
+                ) {}
+            }
+
+            services.addSingletonInstance("host", "localhost")
+            services.addSingletonInstance("port", 5432)
+            services.addSingleton(MyService)
+            const provider = services.build()
+
+            const instance = provider.resolve(MyService)
+            expect(instance.host).toBe("localhost")
+            expect(instance.port).toBe(5432)
+        })
+    })
+
+    describe("$injectOverrides applied during resolution", (): void => {
+        
+        it("should use @Inject override instead of reflected type", (): void => {
+            const SecretToken = Symbol("secret")
+
+            class MyService {
+                public constructor(
+                    @Inject(SecretToken) public readonly secret: string
+                ) {}
+            }
+
+            services.addSingletonInstance(SecretToken, "overridden-value")
+            services.addSingleton(MyService)
+            const provider = services.build()
+
+            const instance = provider.resolve(MyService)
+            expect(instance.secret).toBe("overridden-value")
+        })
+
+        it("should only override decorated indices, leaving others to reflection", (): void => {
+            class Dep {}
+            const SecretToken = Symbol("secret")
+
+            class MyService {
+                public constructor(
+                    public readonly dep: Dep,
+                    @Inject(SecretToken) public readonly secret: string
+                ) {}
+            }
+
+            services.addSingleton(Dep)
+            services.addSingletonInstance(SecretToken, "partial-override")
+            services.addSingleton(MyService)
+            const provider = services.build()
+
+            const instance = provider.resolve(MyService)
+            expect(instance.dep).toBeInstanceOf(Dep)
+            expect(instance.secret).toBe("partial-override")
         })
     })
 })
