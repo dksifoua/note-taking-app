@@ -1,5 +1,8 @@
 {
     "name": "note-taking-app",
+    "version": "0.0.1",
+    "author": "Dimitri Sifoua <dimitri.sifoua@.com>",
+    "license": "MIT",
     "type": "module",
     "module": "index.ts",
     "private": true,
