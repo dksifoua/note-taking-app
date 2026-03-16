@@ -1,4 +1,4 @@
-import type { IScopedServiceProvider } from "@shared/ioc"
+import type { IServiceProvider } from "@shared/ioc"
 
 export type MayBePromise<T> = T | Promise<T>
 
@@ -24,7 +24,7 @@ export type HttpRouteParams = Record<string, string>
 export type HttpContext = {
     request: Request
     params: HttpRouteParams
-    scope: IScopedServiceProvider
+    scope: IServiceProvider
 }
 
 export interface IHttpMiddleware {
@@ -35,7 +35,7 @@ export interface IHttpRouter {
     readonly routes: HttpCompiledRoute[]
     
     mount(prefix: string, router: IHttpRouter): IHttpRouter
-    handle(request: Request, scope: IScopedServiceProvider): MayBePromise<Response>
+    handle(request: Request, scope: IServiceProvider): MayBePromise<Response>
     
     get(pathname: string, handler: HttpHandler): IHttpRouter
     post(pathname: string, handler: HttpHandler): IHttpRouter

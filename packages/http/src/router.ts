@@ -1,6 +1,6 @@
 import type { HttpCompiledRoute, HttpHandler, HttpMethod, HttpRouteParams, IHttpRouter } from "./types"
-import type { IScopedServiceProvider } from "@shared/ioc"
 import { HttpRouteNotFoundError } from "./error"
+import type { IServiceProvider } from "@shared/ioc"
 
 export class HttpRouter implements IHttpRouter {
     public readonly routes: HttpCompiledRoute[]
@@ -21,16 +21,9 @@ export class HttpRouter implements IHttpRouter {
         return this
     }
 
-    public async handle(request: Request, scope: IScopedServiceProvider): Promise<Response> {
-        try {
-            const { route, params } = this.match(request)
-            return await route.handlerFn({ request, params, scope })
-        } catch (error) {
-            if (error instanceof HttpRouteNotFoundError) {
-                return Response.json({ message: error.message }, { status: 404 })
-            }
-            throw error
-        }
+    public async handle(request: Request, scope: IServiceProvider): Promise<Response> {
+        const { route, params } = this.match(request)
+        return route.handlerFn({ request, params, scope })
     }
 
     public get(pathname: string, handlerFn: HttpHandler): IHttpRouter {
@@ -87,6 +80,6 @@ export class HttpRouter implements IHttpRouter {
             }
         }
 
-        throw new HttpRouteNotFoundError(`Route [${method} ${pathname}] not found.`)
+        throw new HttpRouteNotFoundError(request)
     }
 }

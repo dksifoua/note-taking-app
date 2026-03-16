@@ -8,8 +8,9 @@ import type {
     MayBePromise
 } from "./types"
 import { HttpRouter } from "./router"
-import { type IServiceProvider } from "@shared/ioc"
 import { type ILogger, Logger } from "@shared/logging"
+import type { IServiceProvider } from "@shared/ioc"
+import { HttpRouteNotFoundError } from "./error"
 
 export class HttpApplication implements IHttpApplication {
     private readonly router: IHttpRouter
@@ -19,16 +20,16 @@ export class HttpApplication implements IHttpApplication {
     private server: Bun.Server<undefined> | null
     private readonly logger: ILogger
 
-    public constructor(provider: IServiceProvider, router?: HttpRouter, logger?: ILogger) {
+    public constructor(provider: IServiceProvider, logger?: ILogger) {
         this.provider = provider
-        this.router = router ?? new HttpRouter()
+        this.router = new HttpRouter()
         this.middlewares = []
         this.server = null
         this.errorHandler = (error: unknown): Response => {
             const message = error instanceof Error ? error.message : "Internal Server Error"
             return Response.json({ error: message }, { status: 500 })
         }
-        this.logger = logger ?? new Logger("Http")
+        this.logger = logger ?? new Logger("HttpApplication")
     }
 
     private async applyMiddlewares(context: HttpContext, final: HttpHandler): Promise<Response> {
@@ -51,7 +52,8 @@ export class HttpApplication implements IHttpApplication {
     public listen(port?: number): void {
         const self = this
 
-        this.server = Bun.serve({
+        // Ensure we pass a valid port only when provided; Bun.serve treats `port: undefined` as invalid in some environments.
+        const serveOptions: Bun.Serve.Options<undefined> = {
             port: port,
             async fetch(request: Request): Promise<Response> {
                 const scope = self.provider.createScope()
@@ -63,13 +65,17 @@ export class HttpApplication implements IHttpApplication {
                         (ctx: HttpContext): MayBePromise<Response> => self.router.handle(ctx.request, ctx.scope)
                     )
                 } catch (error) {
+                    if (error instanceof HttpRouteNotFoundError) {
+                        return Response.json({ error: 'Route not found' }, { status: 404 })
+                    }
                     return self.errorHandler(error, context)
                 } finally {
                     scope.dispose()
                 }
             }
-        })
+        }
 
+        this.server = Bun.serve(serveOptions)
         this.logger.info(`Listening on ${this.server.url}`)
     }
 

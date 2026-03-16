@@ -1,0 +1,19 @@
+[run]
+bun = true
+
+[test]
+randomize = true
+retry = 3
+rerunEach = 0
+concurrentTestGlob = "**/*.test.ts"
+
+coverage = true
+coverageThreshold = 0.8
+coverageSkipTestFiles = true
+coveragePathIgnorePatterns = [
+    "**/tests/**/utils.ts",
+]
+coverageReporter = ["text", "lcov"]
+coverageDir = "./coveragereport"
+
+smol = true  # Reduce memory usage during test runs

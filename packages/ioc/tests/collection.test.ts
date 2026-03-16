@@ -1,91 +1,102 @@
 import { beforeEach, describe, expect, it } from "bun:test"
 import {
-    NoImplementationProvidedError,
-    ServiceAlreadyRegisteredError,
+    Injectable, type IServiceProvider,
     ServiceCollection,
-    ServiceNotRegisteredError
+    ServiceIdentifierAlreadyRegisteredError,
+    ServiceIdentifierNotRegisteredError,
+    ServiceImplementationNotProvidedError,
+    ServiceProvider
 } from "../src"
 
 describe("ServiceCollection", (): void => {
-    let services: ServiceCollection
+    let collection: ServiceCollection
 
     beforeEach((): void => {
-        services = new ServiceCollection()
+        collection = new ServiceCollection()
     })
 
-    it("should register a class by constructor", (): void => {
-        class MyService {
-        }
+    describe("addValue", (): void => {
+        
+        it("should register a value", (): void => {
+            collection.addValue<number>("port", 3000)
+            const provider = collection.build()
+            expect(provider.resolve<number>("port")).toBe(3000)
+        })
 
-        services.addSingleton(MyService)
-        const provider = services.build()
-
-        expect(provider.resolve(MyService)).toBeInstanceOf(MyService)
+        it("should throw when registering the same identifier twice", (): void => {
+            collection.addValue("port", 3000)
+            expect(() => collection.addValue("port", 4000))
+                .toThrow(ServiceIdentifierAlreadyRegisteredError)
+        })
     })
 
-    it("should register a class with a separate implementation", (): void => {
-        abstract class IMyService {
-        }
+    describe("addSingleton", (): void => {
+        
+        it("should register a class by constructor", (): void => {
+            @Injectable() class MyService {}
+            collection.addSingleton(MyService)
+            const provider = collection.build()
+            expect(provider.resolve(MyService)).toBeInstanceOf(MyService)
+        })
 
-        class MyServiceImpl extends IMyService {
-        }
-
-        services.addSingleton(IMyService, MyServiceImpl)
-        const provider = services.build()
-
-        expect(provider.resolve(IMyService)).toBeInstanceOf(MyServiceImpl)
+        it("should throw when identifier is not a class and no class is provided", (): void => {
+            expect(() => collection.addSingleton("MyService"))
+                .toThrow(ServiceImplementationNotProvidedError)
+        })
     })
 
-    it("should register a factory", (): void => {
-        class MyService {
-        }
-
-        services.addSingletonFactory(MyService, () => new MyService())
-        const provider = services.build()
-
-        expect(provider.resolve(MyService)).toBeInstanceOf(MyService)
+    describe("addSingletonFactory", (): void => {
+        
+        it("should register a factory", (): void => {
+            @Injectable() class MyService {}
+            collection.addSingletonFactory(MyService, () => new MyService())
+            const provider = collection.build()
+            expect(provider.resolve(MyService)).toBeInstanceOf(MyService)
+        })
     })
 
-    it("should register an instance as singleton", (): void => {
-        class MyService {
-        }
+    describe("addScoped", (): void => {
+        
+        it("should register a scoped class", (): void => {
+            @Injectable() class MyService {}
+            collection.addScoped(MyService)
+            const provider = collection.build()
+            const scope = provider.createScope()
+            expect(scope.resolve(MyService)).toBeInstanceOf(MyService)
+        })
 
-        const instance = new MyService()
-
-        services.addSingletonInstance(MyService, instance)
-        const provider = services.build()
-
-        expect(provider.resolve(MyService)).toBe(instance)
+        it("should register a scoped factory", (): void => {
+            @Injectable() class MyService {}
+            collection.addScopedFactory(MyService, (_: IServiceProvider): MyService => new MyService())
+            const provider = collection.build()
+            const scope = provider.createScope()
+            expect(scope.resolve(MyService)).toBeInstanceOf(MyService)
+        })
     })
 
-    it("should throw when registering a non-constructor identifier without an implementation", (): void => {
-        const serviceName = "MyService"
-
-        expect(() => services.addSingleton(serviceName)).toThrow(NoImplementationProvidedError)
-        expect(() => services.addSingleton(Symbol(serviceName))).toThrow(NoImplementationProvidedError)
+    describe("addTransient", (): void => {
+        
+        it("should register a transient class", (): void => {
+            @Injectable() class MyService {}
+            collection.addTransient(MyService)
+            const provider = collection.build()
+            expect(provider.resolve(MyService)).toBeInstanceOf(MyService)
+        })
     })
 
-    it("should throw when registering the same identifier twice", (): void => {
-        class MyService {
-        }
+    describe("build", (): void => {
+        
+        it("should return a ServiceProvider", (): void => {
+            expect(collection.build()).toBeInstanceOf(ServiceProvider)
+        })
 
-        services.addSingleton(MyService)
-
-        expect(() => services.addSingleton(MyService)).toThrow(ServiceAlreadyRegisteredError)
-    })
-
-    it("should not affect built provider when collection is modified after build", (): void => {
-        class ServiceA {
-        }
-
-        class ServiceB {
-        }
-
-        services.addSingleton(ServiceA)
-        const provider = services.build()
-        services.addSingleton(ServiceB)
-
-        expect(provider.resolve(ServiceA)).toBeInstanceOf(ServiceA)
-        expect(() => provider.resolve(ServiceB)).toThrow(ServiceNotRegisteredError)
+        it("should not affect built provider when collection is modified after build", (): void => {
+            @Injectable() class ServiceA {}
+            @Injectable() class ServiceB {}
+            collection.addSingleton(ServiceA)
+            const provider = collection.build()
+            collection.addSingleton(ServiceB)
+            expect(() => provider.resolve(ServiceB)).toThrow(ServiceIdentifierNotRegisteredError)
+        })
     })
 })

@@ -1,7 +1,6 @@
 import { UserService } from "../services"
 
-export class UserHandler {
-    public static $inject = [UserService]   
+export class UserHandler { 
     private readonly userService: UserService
 
     public constructor(userService: UserService) {

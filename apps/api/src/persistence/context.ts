@@ -1,6 +1,6 @@
 import type { ClientSession, Connection, Model } from "mongoose"
 import { type IUser, UserSchema } from "../schemas/"
-import { Inject } from "@shared/ioc"
+import { Inject } from "packages/di"
 import { Tokens } from "../tokens"
 
 export class DatabaseContext {
