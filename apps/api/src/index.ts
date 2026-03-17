@@ -6,8 +6,8 @@ import mongoose from "mongoose"
 import { UserRepository } from "./repositories"
 import { UserService } from "./services"
 import { UserHandler } from "./handlers/user.handler"
-import { Tokens } from "./tokens"
 import { ServiceCollection } from "@shared/ioc"
+import { LoggingMiddleware } from "./middlewares"
 
 const logger = new Logger("API", "info")
 try {
@@ -19,7 +19,8 @@ try {
 
 const services = new ServiceCollection()
 services.addValue(Logger, logger)
-services.addValue(Tokens.Connection, mongoose.connection)
+services.addValue("connection", mongoose.connection)
+services.addSingleton(LoggingMiddleware)
 services.addScoped(DatabaseContext)
 services.addScoped(UserRepository)
 services.addScoped(UserService)
@@ -36,6 +37,7 @@ const router = new HttpRouter()
     )
 
 const app = new HttpApplication(provider, logger)
+app.use(provider.resolve(LoggingMiddleware))
 app.mount("/api", router)
 app.onError((error: unknown, _: HttpContext): MayBePromise<Response> => {
     const message = error instanceof Error ? error.message : "Internal Server Error"

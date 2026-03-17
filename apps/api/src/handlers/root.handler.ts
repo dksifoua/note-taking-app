@@ -1,5 +1,7 @@
 import packageJson from "../../package.json"
+import { Injectable } from "@shared/ioc"
 
+@Injectable()
 export class RootHandler {
 
     public async home(): Promise<Response> {

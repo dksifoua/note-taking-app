@@ -1,26 +1,16 @@
 import { beforeEach, describe, expect, it } from "bun:test"
-import { type HttpContext, HttpRouteNotFoundError, type IHttpRouter } from "../src"
-import { HttpRouter } from "../src"
-
-const mockScope = {} as any
-
-async function okHandler(_: HttpContext): Promise<Response> {
-    return new Response("ok", { status: 200 })
-}
-
-function makeRequest(method: string, url: string): Request {
-    return new Request(url, { method })
-}
+import { type HttpContext, HttpRouteNotFoundError, HttpRouter } from "../src"
+import { makeRequest, mockScope, okHandler } from "./utils"
 
 describe("HttpRouter", (): void => {
-    let router: IHttpRouter
+    let router: HttpRouter
 
     beforeEach((): void => {
         router = new HttpRouter()
     })
 
     describe("route registration", (): void => {
-
+        
         it("should register a GET route", (): void => {
             router.get("/users", okHandler)
             expect(router.routes).toHaveLength(1)
@@ -30,22 +20,30 @@ describe("HttpRouter", (): void => {
 
         it("should register a POST route", (): void => {
             router.post("/users", okHandler)
+            expect(router.routes).toHaveLength(1)
             expect(router.routes[0]!.method).toBe("POST")
+            expect(router.routes[0]!.pathname).toBe("/users")
         })
 
         it("should register a PUT route", (): void => {
             router.put("/users/:id", okHandler)
+            expect(router.routes).toHaveLength(1)
             expect(router.routes[0]!.method).toBe("PUT")
+            expect(router.routes[0]!.pathname).toBe("/users/:id")
         })
 
         it("should register a PATCH route", (): void => {
             router.patch("/users/:id", okHandler)
+            expect(router.routes).toHaveLength(1)
             expect(router.routes[0]!.method).toBe("PATCH")
+            expect(router.routes[0]!.pathname).toBe("/users/:id")
         })
 
         it("should register a DELETE route", (): void => {
             router.delete("/users/:id", okHandler)
+            expect(router.routes).toHaveLength(1)
             expect(router.routes[0]!.method).toBe("DELETE")
+            expect(router.routes[0]!.pathname).toBe("/users/:id")
         })
 
         it("should support method chaining", (): void => {
@@ -53,7 +51,6 @@ describe("HttpRouter", (): void => {
                 .get("/users", okHandler)
                 .post("/users", okHandler)
                 .delete("/users/:id", okHandler)
-
             expect(router.routes).toHaveLength(3)
         })
 
@@ -64,32 +61,45 @@ describe("HttpRouter", (): void => {
     })
 
     describe("handle", (): void => {
-
+        
         it("should match and call the correct handler", async (): Promise<void> => {
-            router.get("/users", async (_: HttpContext): Promise<Response> =>
+            router.get("/users", async (): Promise<Response> =>
                 new Response("users list", { status: 200 })
             )
-            const response = await router.handle(makeRequest("GET", "http://localhost/users"), mockScope)
+            const response = await router.handle(makeRequest("GET", "/users"), mockScope)
             expect(response.status).toBe(200)
             expect(await response.text()).toBe("users list")
         })
-
-        it("should throw when no route matches", async (): Promise<void> => {
-            const request = makeRequest("GET", "http://localhost/unknown")
-            expect(router.handle(request, mockScope)).rejects.toThrow(HttpRouteNotFoundError)
+        
+        it("should throw HttpRouteNotFoundError when no route matches", (): void => {
+            expect(() => (router as any).match(makeRequest("GET", "/unknown")))
+                .toThrow(HttpRouteNotFoundError)
         })
 
-        it("should throw when method does not match", async (): Promise<void> => {
+        it("should return 404 when no route matches", async (): Promise<void> => {
+            const response = await router.handle(makeRequest("GET", "/unknown"), mockScope)
+            expect(response.status).toBe(404)
+            expect((await response.json() as { error: string }).error).toBe("Route [GET /unknown] not found.")
+        })
+
+        it("should throw HttpRouteNotFoundError when method does not match", (): void => {
             router.get("/users", okHandler)
-            let request = makeRequest("POST", "http://localhost/users")
-            expect(router.handle(request, mockScope)).rejects.toThrow(HttpRouteNotFoundError)
+            expect(() => (router as any).match(makeRequest("POST", "/users")))
+                .toThrow(HttpRouteNotFoundError)
+        })
+
+        it("should return 404 when method does not match", async (): Promise<void> => {
+            router.get("/users", okHandler)
+            const response = await router.handle(makeRequest("POST", "/users"), mockScope)
+            expect(response.status).toBe(404)
+            expect((await response.json() as { error: string }).error).toBe("Route [POST /users] not found.")
         })
 
         it("should extract route params and pass them to the handler", async (): Promise<void> => {
             router.get("/users/:id", async (ctx: HttpContext): Promise<Response> =>
                 new Response(ctx.params.id, { status: 200 })
             )
-            const response = await router.handle(makeRequest("GET", "http://localhost/users/42"), mockScope)
+            const response = await router.handle(makeRequest("GET", "/users/42"), mockScope)
             expect(await response.text()).toBe("42")
         })
 
@@ -97,62 +107,54 @@ describe("HttpRouter", (): void => {
             router.get("/users/:userId/posts/:postId", async (ctx: HttpContext): Promise<Response> =>
                 Response.json({ userId: ctx.params.userId, postId: ctx.params.postId })
             )
-            const response = await router.handle(makeRequest("GET", "http://localhost/users/1/posts/2"), mockScope)
+            const response = await router.handle(makeRequest("GET", "/users/1/posts/2"), mockScope)
             const body = await response.json()
             expect(body).toEqual({ userId: "1", postId: "2" })
         })
 
-        it("should pass the scope to the handler context", async (): Promise<void> => {
-            const scope = { id: "test-scope" } as any
+        it("should pass scope to the handler context", async (): Promise<void> => {
             let receivedScope: any
-
             router.get("/test", async (ctx: HttpContext): Promise<Response> => {
                 receivedScope = ctx.scope
                 return new Response("ok")
             })
-
-            await router.handle(makeRequest("GET", "http://localhost/test"), scope)
-            expect(receivedScope).toBe(scope)
+            await router.handle(makeRequest("GET", "/test"), mockScope)
+            expect(receivedScope).toBe(mockScope)
         })
 
-        it("should pass the request to the handler context", async (): Promise<void> => {
+        it("should pass request to the handler context", async (): Promise<void> => {
             let receivedRequest: Request | undefined
-
             router.get("/test", async (ctx: HttpContext): Promise<Response> => {
                 receivedRequest = ctx.request
                 return new Response("ok")
             })
-
-            const request = makeRequest("GET", "http://localhost/test")
+            const request = makeRequest("GET", "/test")
             await router.handle(request, mockScope)
             expect(receivedRequest).toBe(request)
         })
 
         it("should rethrow non-routing errors from handlers", async (): Promise<void> => {
-            router.get("/boom", async (_: HttpContext): Promise<Response> => {
+            router.get("/boom", async (): Promise<Response> => {
                 throw new Error("Something went wrong")
             })
-
-            expect(
-                router.handle(makeRequest("GET", "http://localhost/boom"), mockScope)
-            ).rejects.toThrow("Something went wrong")
+            expect(router.handle(makeRequest("GET", "/boom"), mockScope))
+                .rejects.toThrow("Something went wrong")
         })
 
         it("should tolerate trailing slashes on request URL", async (): Promise<void> => {
             router.get("/users", okHandler)
-            const response = await router.handle(makeRequest("GET", "http://localhost/users/"), mockScope)
+            const response = await router.handle(makeRequest("GET", "/users/"), mockScope)
             expect(response.status).toBe(200)
         })
     })
 
     describe("mount", (): void => {
+        
         it("should mount a sub-router with a prefix", (): void => {
             const sub = new HttpRouter()
             sub.get("/", okHandler)
             sub.post("/:id", okHandler)
-
             router.mount("/users", sub)
-
             expect(router.routes).toHaveLength(2)
             expect(router.routes[0]!.pathname).toBe("/users")
             expect(router.routes[1]!.pathname).toBe("/users/:id")
@@ -160,13 +162,9 @@ describe("HttpRouter", (): void => {
 
         it("should match routes from a mounted sub-router", async (): Promise<void> => {
             const sub = new HttpRouter()
-            sub.get("/", async (_: HttpContext): Promise<Response> =>
-                new Response("mounted", { status: 200 })
-            )
-
+            sub.get("/", async (): Promise<Response> => new Response("mounted", { status: 200 }))
             router.mount("/users", sub)
-
-            const response = await router.handle(makeRequest("GET", "http://localhost/users"), mockScope)
+            const response = await router.handle(makeRequest("GET", "/users"), mockScope)
             expect(response.status).toBe(200)
             expect(await response.text()).toBe("mounted")
         })
@@ -174,34 +172,25 @@ describe("HttpRouter", (): void => {
         it("should tolerate trailing slash on mount prefix", (): void => {
             const sub = new HttpRouter()
             sub.get("/", okHandler)
-
             router.mount("/users/", sub)
-
             expect(router.routes[0]!.pathname).toBe("/users")
         })
 
         it("should handle params in mounted sub-router routes", async (): Promise<void> => {
             const sub = new HttpRouter()
-            sub.get("/:id", async (ctx: HttpContext): Promise<Response> =>
-                new Response(ctx.params.id)
-            )
-
+            sub.get("/:id", async (ctx: HttpContext): Promise<Response> => new Response(ctx.params.id))
             router.mount("/users", sub)
-
-            const response = await router.handle(makeRequest("GET", "http://localhost/users/99"), mockScope)
+            const response = await router.handle(makeRequest("GET", "/users/99"), mockScope)
             expect(await response.text()).toBe("99")
         })
 
         it("should allow mounting multiple sub-routers", (): void => {
             const users = new HttpRouter()
             users.get("/", okHandler)
-
             const posts = new HttpRouter()
             posts.get("/", okHandler)
-
             router.mount("/users", users)
             router.mount("/posts", posts)
-
             expect(router.routes).toHaveLength(2)
             expect(router.routes[0]!.pathname).toBe("/users")
             expect(router.routes[1]!.pathname).toBe("/posts")

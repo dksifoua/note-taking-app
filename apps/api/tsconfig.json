@@ -27,6 +27,5 @@
         // Reflect Metadata
         "experimentalDecorators": true,
         "emitDecoratorMetadata": true
-    },
-    "reflection": true
+    }
 }

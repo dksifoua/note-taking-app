@@ -7,3 +7,10 @@ export class HttpRouteNotFoundError extends Error {
         super(`Route [${method} ${pathname}] not found.`)
     }
 }
+
+export class HttpServerNotRunningError extends Error {
+    
+    public constructor() {
+        super("Server is not running.")
+    }
+}

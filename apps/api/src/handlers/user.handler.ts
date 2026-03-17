@@ -1,5 +1,7 @@
 import { UserService } from "../services"
+import { Injectable } from "@shared/ioc"
 
+@Injectable()
 export class UserHandler { 
     private readonly userService: UserService
 

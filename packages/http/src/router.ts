@@ -7,8 +7,6 @@ export class HttpRouter implements IHttpRouter {
 
     public constructor() {
         this.routes = []
-
-        this.handle = this.handle.bind(this)
     }
 
     public mount(prefix: string, router: IHttpRouter): IHttpRouter {
@@ -22,8 +20,15 @@ export class HttpRouter implements IHttpRouter {
     }
 
     public async handle(request: Request, scope: IServiceProvider): Promise<Response> {
-        const { route, params } = this.match(request)
-        return route.handlerFn({ request, params, scope })
+        try {
+            const { route, params } = this.match(request)
+            return await route.handlerFn({ request, params, scope })
+        } catch (error) {
+            if (error instanceof HttpRouteNotFoundError) {
+                return Response.json({ error: error.message }, { status: 404 })
+            }
+            throw error
+        }
     }
 
     public get(pathname: string, handlerFn: HttpHandler): IHttpRouter {

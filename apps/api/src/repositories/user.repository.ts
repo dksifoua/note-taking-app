@@ -2,9 +2,10 @@ import { DatabaseContext } from "../persistence"
 import type { IUser } from "../schemas"
 import type { IUserDocument, IUserRepository } from "./contracts"
 import type { ClientSession } from "mongoose"
+import { Injectable } from "@shared/ioc"
 
+@Injectable()
 export class UserRepository implements IUserRepository {
-    public static $inject = [DatabaseContext]
     private readonly context: DatabaseContext
 
     public constructor(databaseContext: DatabaseContext) {

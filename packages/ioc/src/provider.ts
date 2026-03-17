@@ -65,7 +65,7 @@ export class ServiceProvider implements IServiceProvider {
         scope?: ScopeProvider
     ): T {
         const descriptor: ServiceDescriptor<T> | undefined = this.descriptors.get(identifier)
-        if (!descriptor) {
+        if (descriptor === undefined) {
             throw new ServiceIdentifierNotRegisteredError(identifier)
         }
 

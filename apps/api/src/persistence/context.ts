@@ -1,14 +1,13 @@
 import type { ClientSession, Connection, Model } from "mongoose"
 import { type IUser, UserSchema } from "../schemas/"
-import { Inject } from "packages/di"
-import { Tokens } from "../tokens"
+import { Inject, Injectable } from "@shared/ioc"
 
+@Injectable()
 export class DatabaseContext {
-    public static $inject = [Tokens.Connection]
     private readonly connection: Connection
     public readonly Users: Model<IUser>
 
-    public constructor(@Inject(Tokens.Connection) connection: Connection) {
+    public constructor(@Inject("connection") connection: Connection) {
         this.connection = connection
 
         this.Users = (this.connection.models["User"] as Model<IUser>) 

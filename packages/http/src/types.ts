@@ -1,4 +1,4 @@
-import type { IServiceProvider } from "@shared/ioc"
+import type { IServiceProvider, ServiceIdentifier } from "@shared/ioc"
 
 export type MayBePromise<T> = T | Promise<T>
 
@@ -44,17 +44,12 @@ export interface IHttpRouter {
     delete(pathname: string, handler: HttpHandler): IHttpRouter
 }
 
-export interface IHttpController {
-    readonly prefix: string
-    registerEndpoints(router: IHttpRouter): IHttpRouter
-}
-
 export interface IHttpApplication {
     listen(port?: number): void
     shutdown(): void
     onError(handler: (error: unknown, context: HttpContext) => MayBePromise<Response>): IHttpApplication
 
-    use(middleware: IHttpMiddleware): IHttpApplication
+    use(middleware: IHttpMiddleware | ServiceIdentifier<IHttpMiddleware>): IHttpApplication
     mount(prefix: string, router: IHttpRouter): IHttpApplication
 
     get(pathname: string, handler: HttpHandler): IHttpApplication

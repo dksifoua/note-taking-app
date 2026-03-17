@@ -8,19 +8,19 @@ import type {
     MayBePromise
 } from "./types"
 import { HttpRouter } from "./router"
-import { type ILogger, Logger } from "@shared/logging"
-import type { IServiceProvider } from "@shared/ioc"
-import { HttpRouteNotFoundError } from "./error"
+import { type ILogger } from "@shared/logging"
+import type { IServiceProvider, ServiceIdentifier } from "@shared/ioc"
+import { HttpServerNotRunningError } from "./error"
 
 export class HttpApplication implements IHttpApplication {
     private readonly router: IHttpRouter
     private readonly provider: IServiceProvider
-    private readonly middlewares: IHttpMiddleware[]
+    private readonly middlewares: (IHttpMiddleware | ServiceIdentifier<IHttpMiddleware>)[]
     private errorHandler: HttpErrorHandler
     private server: Bun.Server<undefined> | null
     private readonly logger: ILogger
 
-    public constructor(provider: IServiceProvider, logger?: ILogger) {
+    public constructor(provider: IServiceProvider, logger: ILogger) {
         this.provider = provider
         this.router = new HttpRouter()
         this.middlewares = []
@@ -29,21 +29,23 @@ export class HttpApplication implements IHttpApplication {
             const message = error instanceof Error ? error.message : "Internal Server Error"
             return Response.json({ error: message }, { status: 500 })
         }
-        this.logger = logger ?? new Logger("HttpApplication")
+        this.logger = logger
     }
 
     private async applyMiddlewares(context: HttpContext, final: HttpHandler): Promise<Response> {
         const middlewares = this.middlewares
 
         async function dispatch(index: number): Promise<Response> {
-            const middleware = middlewares[index]
-            if (middleware === undefined) {
+            const value = middlewares[index]
+            if (value === undefined) {
                 return Promise.resolve(final(context))
             }
 
-            return Promise.resolve(
-                middleware.apply(context, (): MayBePromise<Response> => dispatch(index + 1))
-            )
+            const middleware: IHttpMiddleware = isMiddlewareInstance(value)
+                ? value
+                : context.scope.resolve<IHttpMiddleware>(value)
+
+            return Promise.resolve(middleware.apply(context, (): MayBePromise<Response> => dispatch(index + 1)))
         }
 
         return dispatch(0)
@@ -65,9 +67,6 @@ export class HttpApplication implements IHttpApplication {
                         (ctx: HttpContext): MayBePromise<Response> => self.router.handle(ctx.request, ctx.scope)
                     )
                 } catch (error) {
-                    if (error instanceof HttpRouteNotFoundError) {
-                        return Response.json({ error: 'Route not found' }, { status: 404 })
-                    }
                     return self.errorHandler(error, context)
                 } finally {
                     scope.dispose()
@@ -81,14 +80,14 @@ export class HttpApplication implements IHttpApplication {
 
     public shutdown(): void {
         if (this.server === null) {
-            throw new Error("Server is not running.")
+            throw new HttpServerNotRunningError()
         }
 
         this.server.stop()
         this.server = null
     }
 
-    public use(middleware: IHttpMiddleware): IHttpApplication {
+    public use(middleware: IHttpMiddleware | ServiceIdentifier<IHttpMiddleware>): IHttpApplication {
         this.middlewares.push(middleware)
         return this
     }
@@ -127,4 +126,8 @@ export class HttpApplication implements IHttpApplication {
         this.router.delete(pathname, handler)
         return this
     }
+}
+
+function isMiddlewareInstance(value: IHttpMiddleware | ServiceIdentifier<IHttpMiddleware>): value is IHttpMiddleware {
+    return typeof value === "object" && "apply" in value
 }
