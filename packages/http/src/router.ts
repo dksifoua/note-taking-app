@@ -1,5 +1,5 @@
 import type { HttpCompiledRoute, HttpHandler, HttpMethod, HttpRouteParams, IHttpRouter } from "./types"
-import { HttpRouteNotFoundError } from "./error"
+import { RouteNotFoundHttpError } from "./errors"
 import type { IServiceProvider } from "@shared/ioc"
 
 export class HttpRouter implements IHttpRouter {
@@ -15,20 +15,13 @@ export class HttpRouter implements IHttpRouter {
         for (const route of router.routes) {
             this.add(route.method, normalisedPrefix + route.pathname.replace(/\/$/, ""), route.handlerFn)
         }
-        
+
         return this
     }
 
     public async handle(request: Request, scope: IServiceProvider): Promise<Response> {
-        try {
-            const { route, params } = this.match(request)
-            return await route.handlerFn({ request, params, scope })
-        } catch (error) {
-            if (error instanceof HttpRouteNotFoundError) {
-                return Response.json({ error: error.message }, { status: 404 })
-            }
-            throw error
-        }
+        const { route, params } = this.match(request)
+        return route.handlerFn({ request, params, scope })
     }
 
     public get(pathname: string, handlerFn: HttpHandler): IHttpRouter {
@@ -85,6 +78,6 @@ export class HttpRouter implements IHttpRouter {
             }
         }
 
-        throw new HttpRouteNotFoundError(request)
+        throw new RouteNotFoundHttpError(request)
     }
 }

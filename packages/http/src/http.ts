@@ -1,22 +1,13 @@
-import type {
-    HttpContext,
-    HttpErrorHandler,
-    HttpHandler,
-    IHttpApplication,
-    IHttpMiddleware,
-    IHttpRouter,
-    MayBePromise
-} from "./types"
+import type { HttpContext, HttpHandler, IHttpApplication, IHttpMiddleware, IHttpRouter, MayBePromise } from "./types"
 import { HttpRouter } from "./router"
 import { type ILogger } from "@shared/logging"
 import type { IServiceProvider, ServiceIdentifier } from "@shared/ioc"
-import { HttpServerNotRunningError } from "./error"
+import { HttpError, ServerNotRunningError } from "./errors"
 
 export class HttpApplication implements IHttpApplication {
     private readonly router: IHttpRouter
     private readonly provider: IServiceProvider
     private readonly middlewares: (IHttpMiddleware | ServiceIdentifier<IHttpMiddleware>)[]
-    private errorHandler: HttpErrorHandler
     private server: Bun.Server<undefined> | null
     private readonly logger: ILogger
 
@@ -25,10 +16,6 @@ export class HttpApplication implements IHttpApplication {
         this.router = new HttpRouter()
         this.middlewares = []
         this.server = null
-        this.errorHandler = (error: unknown): Response => {
-            const message = error instanceof Error ? error.message : "Internal Server Error"
-            return Response.json({ error: message }, { status: 500 })
-        }
         this.logger = logger
     }
 
@@ -51,6 +38,14 @@ export class HttpApplication implements IHttpApplication {
         return dispatch(0)
     }
 
+    private handleError(error: unknown): Response {
+        if (error instanceof HttpError) {
+            return error.toResponse()
+        }
+        const message = error instanceof Error ? error.message : "Internal Server Error"
+        return Response.json({ error: message }, { status: 500 })
+    }
+
     public listen(port?: number): void {
         const self = this
 
@@ -67,7 +62,7 @@ export class HttpApplication implements IHttpApplication {
                         (ctx: HttpContext): MayBePromise<Response> => self.router.handle(ctx.request, ctx.scope)
                     )
                 } catch (error) {
-                    return self.errorHandler(error, context)
+                    return self.handleError(error)
                 } finally {
                     scope.dispose()
                 }
@@ -80,7 +75,7 @@ export class HttpApplication implements IHttpApplication {
 
     public shutdown(): void {
         if (this.server === null) {
-            throw new HttpServerNotRunningError()
+            throw new ServerNotRunningError()
         }
 
         this.server.stop()
@@ -94,11 +89,6 @@ export class HttpApplication implements IHttpApplication {
 
     public mount(prefix: string, router: IHttpRouter): IHttpApplication {
         this.router.mount(prefix, router)
-        return this
-    }
-
-    public onError(handler: HttpErrorHandler): IHttpApplication {
-        this.errorHandler = handler
         return this
     }
 

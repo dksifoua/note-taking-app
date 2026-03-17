@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test"
-import { HttpApplication, type HttpContext, HttpRouter, HttpServerNotRunningError } from "../src"
+import { HttpApplication, type HttpContext, HttpError, type HttpHandler, HttpRouter } from "../src"
 import { mockLogger, mockProvider, mockScope, okHandler } from "./utils"
+import { ServerNotRunningError } from "../src/errors"
 
 
 describe("HttpApplication", (): void => {
@@ -31,7 +32,7 @@ describe("HttpApplication", (): void => {
         })
 
         it("should throw when shutting down a server that is not running", (): void => {
-            expect(() => app.shutdown()).toThrow(HttpServerNotRunningError)
+            expect(() => app.shutdown()).toThrow(ServerNotRunningError)
         })
     })
 
@@ -120,7 +121,7 @@ describe("HttpApplication", (): void => {
         it("should apply middleware before the handler", async (): Promise<void> => {
             const order: string[] = []
             app.use({
-                apply: async (ctx, next) => {
+                apply: async (ctx: HttpContext, next: HttpHandler) => {
                     order.push("middleware")
                     return next(ctx)
                 }
@@ -138,13 +139,13 @@ describe("HttpApplication", (): void => {
         it("should apply multiple middlewares in order", async (): Promise<void> => {
             const order: string[] = []
             app.use({
-                apply: async (ctx, next) => {
+                apply: async (ctx: HttpContext, next: HttpHandler) => {
                     order.push("first")
                     return next(ctx)
                 }
             })
             app.use({
-                apply: async (ctx, next) => {
+                apply: async (ctx: HttpContext, next: HttpHandler) => {
                     order.push("second")
                     return next(ctx)
                 }
@@ -171,7 +172,7 @@ describe("HttpApplication", (): void => {
 
         it("should allow middleware to modify the response", async (): Promise<void> => {
             app.use({
-                apply: async (ctx, next): Promise<Response> => {
+                apply: async (ctx: HttpContext, next: HttpHandler): Promise<Response> => {
                     const response = await next(ctx)
                     return new Response(response.body, {
                         status: response.status,
@@ -187,55 +188,75 @@ describe("HttpApplication", (): void => {
         })
 
         it("should support method chaining on use", (): void => {
-            expect(app.use({ apply: async (ctx, next) => next(ctx) })).toBe(app)
+            expect(app.use({ apply: async (ctx: HttpContext, next: HttpHandler) => next(ctx) })).toBe(app)
         })
     })
 
     describe("error handling", (): void => {
 
-        it("should return 500 by default when a handler throws", async (): Promise<void> => {
-            app.get("/boom", async (): Promise<Response> => {
-                throw new Error("Something went wrong")
-            })
+        it("should return 500 when handler throws a generic error", async (): Promise<void> => {
+            app.get("/boom", async (): Promise<Response> => { throw new Error("Something went wrong") })
             app.listen(0)
             const port = (app["server"] as Bun.Server<any>).port!
             const response = await fetch(`http://localhost:${port}/boom`)
             expect(response.status).toBe(500)
+            const body = await response.json() as { error: string }
+            expect(body.error).toBe("Something went wrong")
         })
 
-        it("should use custom error handler when registered", async (): Promise<void> => {
-            app.onError((): Response => new Response("custom error", { status: 503 }))
-            app.get("/boom", async (): Promise<Response> => {
-                throw new Error("boom")
+        it("should return correct status when handler throws HttpError", async (): Promise<void> => {
+            app.get("/unauthorized", async (): Promise<Response> => {
+                throw new HttpError({ status: 401, body: { error: "Unauthorized" } })
             })
+            app.listen(0)
+            const port = (app["server"] as Bun.Server<any>).port!
+            const response = await fetch(`http://localhost:${port}/unauthorized`)
+            expect(response.status).toBe(401)
+            const body = await response.json() as { error: string }
+            expect(body.error).toBe("Unauthorized")
+        })
+
+        it("should return 404 when route is not found", async (): Promise<void> => {
+            app.listen(0)
+            const port = (app["server"] as Bun.Server<any>).port!
+            const response = await fetch(`http://localhost:${port}/unknown`)
+            expect(response.status).toBe(404)
+        })
+
+        it("should return 500 with generic message when non-Error is thrown", async (): Promise<void> => {
+            app.get("/boom", async (): Promise<Response> => { throw "string error" })
             app.listen(0)
             const port = (app["server"] as Bun.Server<any>).port!
             const response = await fetch(`http://localhost:${port}/boom`)
-            expect(response.status).toBe(503)
-            expect(await response.text()).toBe("custom error")
+            expect(response.status).toBe(500)
+            const body = await response.json() as { error: string }
+            expect(body.error).toBe("Internal Server Error")
         })
 
-        it("should pass the error and context to the error handler", async (): Promise<void> => {
-            let receivedError: unknown
-            let receivedContext: HttpContext | undefined
-            app.onError((error, context): Response => {
-                receivedError = error
-                receivedContext = context
-                return new Response("error", { status: 500 })
-            })
-            app.get("/boom", async (): Promise<Response> => {
-                throw new Error("boom")
+        it("should return HttpError response with correct headers", async (): Promise<void> => {
+            app.get("/redirect", async (): Promise<Response> => {
+                throw new HttpError({ status: 302, headers: { location: "/login" } })
             })
             app.listen(0)
             const port = (app["server"] as Bun.Server<any>).port!
-            await fetch(`http://localhost:${port}/boom`)
-            expect(receivedError).toBeInstanceOf(Error)
-            expect((receivedError as Error).message).toBe("boom")
-            expect(receivedContext).toBeDefined()
+            const response = await fetch(`http://localhost:${port}/redirect`, { redirect: "manual" })
+            expect(response.status).toBe(302)
+            expect(response.headers.get("location")).toBe("/login")
         })
 
-        it("should support method chaining on onError", (): void => {
-            expect(app.onError(() => new Response("error", { status: 500 }))).toBe(app)
+        it("should handle HttpError thrown from middleware", async (): Promise<void> => {
+            app.use({
+                apply: async (): Promise<Response> => {
+                    throw new HttpError({ status: 403, body: { error: "Forbidden" } })
+                }
+            })
+            app.get("/test", async (): Promise<Response> => new Response("ok"))
+            app.listen(0)
+            const port = (app["server"] as Bun.Server<any>).port!
+            const response = await fetch(`http://localhost:${port}/test`)
+            expect(response.status).toBe(403)
+            const body = await response.json() as { error: string }
+            expect(body.error).toBe("Forbidden")
         })
 
         it("should dispose the scope even when the handler throws", async (): Promise<void> => {

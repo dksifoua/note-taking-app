@@ -1,4 +1,4 @@
 export * from "./types"
-export * from "./error"
+export * from "./errors/http.error"
 export * from "./router"
 export * from "./http"

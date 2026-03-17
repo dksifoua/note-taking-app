@@ -6,8 +6,6 @@ export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH"
 
 export type HttpHandler = (context: HttpContext) => MayBePromise<Response>
 
-export type HttpErrorHandler = (error: unknown, context: HttpContext) => MayBePromise<Response>
-
 export type HttpRouteDefinition = {
     method: HttpMethod
     pathname: string
@@ -25,6 +23,7 @@ export type HttpContext = {
     request: Request
     params: HttpRouteParams
     scope: IServiceProvider
+    body?: unknown
 }
 
 export interface IHttpMiddleware {
@@ -47,7 +46,6 @@ export interface IHttpRouter {
 export interface IHttpApplication {
     listen(port?: number): void
     shutdown(): void
-    onError(handler: (error: unknown, context: HttpContext) => MayBePromise<Response>): IHttpApplication
 
     use(middleware: IHttpMiddleware | ServiceIdentifier<IHttpMiddleware>): IHttpApplication
     mount(prefix: string, router: IHttpRouter): IHttpApplication

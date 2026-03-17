@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "bun:test"
-import { type HttpContext, HttpRouteNotFoundError, HttpRouter } from "../src"
+import { type HttpContext, HttpRouter, RouteNotFoundHttpError } from "../src"
 import { makeRequest, mockScope, okHandler } from "./utils"
 
 describe("HttpRouter", (): void => {
@@ -72,27 +72,14 @@ describe("HttpRouter", (): void => {
         })
         
         it("should throw HttpRouteNotFoundError when no route matches", (): void => {
-            expect(() => (router as any).match(makeRequest("GET", "/unknown")))
-                .toThrow(HttpRouteNotFoundError)
-        })
-
-        it("should return 404 when no route matches", async (): Promise<void> => {
-            const response = await router.handle(makeRequest("GET", "/unknown"), mockScope)
-            expect(response.status).toBe(404)
-            expect((await response.json() as { error: string }).error).toBe("Route [GET /unknown] not found.")
+            expect(() => router.handle(makeRequest("GET", "/unknown"), mockScope))
+                .toThrow(RouteNotFoundHttpError)
         })
 
         it("should throw HttpRouteNotFoundError when method does not match", (): void => {
             router.get("/users", okHandler)
-            expect(() => (router as any).match(makeRequest("POST", "/users")))
-                .toThrow(HttpRouteNotFoundError)
-        })
-
-        it("should return 404 when method does not match", async (): Promise<void> => {
-            router.get("/users", okHandler)
-            const response = await router.handle(makeRequest("POST", "/users"), mockScope)
-            expect(response.status).toBe(404)
-            expect((await response.json() as { error: string }).error).toBe("Route [POST /users] not found.")
+            expect(() => router.handle(makeRequest("POST", "/users"), mockScope))
+                .toThrow(RouteNotFoundHttpError)
         })
 
         it("should extract route params and pass them to the handler", async (): Promise<void> => {

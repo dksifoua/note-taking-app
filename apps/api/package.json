@@ -2,7 +2,7 @@
     "name": "note-taking-api",
     "description": "A simple note-taking API built with Bun and TypeScript",
     "version": "0.0.1",
-    "author": "Dimitri Sifoua <dimitri.sifoua@.com>",
+    "author": "Dimitri Sifoua <dimitri.sifoua@gmail.com>",
     "license": "MIT",
     "type": "module",
     "module": "src/index.ts",

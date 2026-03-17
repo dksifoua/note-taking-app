@@ -1,13 +1,13 @@
-import { HttpApplication, type HttpContext, HttpRouter, type MayBePromise } from "@shared/http"
+import { HttpApplication, HttpRouter } from "@shared/http"
 import { Logger } from "@shared/logging"
-import { RootHandler } from "./handlers"
+import { ServiceCollection } from "@shared/ioc"
+import { RootHandler, UserHandler } from "./handlers"
 import { DatabaseContext } from "./persistence"
 import mongoose from "mongoose"
 import { UserRepository } from "./repositories"
 import { UserService } from "./services"
-import { UserHandler } from "./handlers/user.handler"
-import { ServiceCollection } from "@shared/ioc"
 import { LoggingMiddleware } from "./middlewares"
+import { JsonBodyParserMiddleware } from "./middlewares/parser.middleware"
 
 const logger = new Logger("API", "info")
 try {
@@ -21,6 +21,7 @@ const services = new ServiceCollection()
 services.addValue(Logger, logger)
 services.addValue("connection", mongoose.connection)
 services.addSingleton(LoggingMiddleware)
+services.addSingleton(JsonBodyParserMiddleware)
 services.addScoped(DatabaseContext)
 services.addScoped(UserRepository)
 services.addScoped(UserService)
@@ -38,13 +39,9 @@ const router = new HttpRouter()
 
 const app = new HttpApplication(provider, logger)
 app.use(provider.resolve(LoggingMiddleware))
+app.use(provider.resolve(JsonBodyParserMiddleware))
 app.mount("/api", router)
-app.onError((error: unknown, _: HttpContext): MayBePromise<Response> => {
-    const message = error instanceof Error ? error.message : "Internal Server Error"
-    logger.error(message)
 
-    return Response.json({ error: message }, { status: 500 })
-})
 app.listen(Number(Bun.env.NOTE_TAKING_API_PORT) || 0)
 
 process.on("SIGINT", (): never => {
