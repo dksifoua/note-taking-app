@@ -10,6 +10,15 @@ export function makeRequest(method: string, path: string): Request {
     return new Request(`http://localhost${path}`, { method })
 }
 
+export function makeContext(method: string, path: string, scope: IServiceProvider): HttpContext {
+    return {
+        request: makeRequest(method, path),
+        scope,
+        body: undefined,
+        params: {},
+    }
+}
+
 export const mockProvider: IServiceProvider = {
     resolve: () => { throw new Error("Not implemented") },
     dispose: (): void => {},

@@ -1,4 +1,4 @@
-import type { HttpContext, HttpHandler, IHttpMiddleware } from "@shared/http"
+import { type HttpContext, HttpError, type HttpHandler, type IHttpMiddleware } from "@shared/http"
 import { Logger } from "@shared/logging"
 import { Injectable } from "@shared/ioc"
 
@@ -8,7 +8,7 @@ const dim = "\x1b[2m"
 const statusColors: Record<string, string> = {
     success: Bun.color("green", "ansi")!,
     redirect: Bun.color("cyan", "ansi")!,
-    clientError: Bun.color("yellow", "ansi")!,
+    clientError: Bun.color("orange", "ansi")!,
     serverError: Bun.color("red", "ansi")!,
 }
 
@@ -29,16 +29,25 @@ export class LoggingMiddleware implements IHttpMiddleware {
 
     public async apply(context: HttpContext, next: HttpHandler): Promise<Response> {
         const start = performance.now()
-        const response = await next(context)
-        const milliseconds = (performance.now() - start).toFixed(2)
 
+        let status: number
+        try {
+            const response = await next(context)
+            status = response.status
+            this.log(context, status, performance.now() - start)
+            return response
+        } catch (error) {
+            status = error instanceof HttpError ? error.status : 500
+            this.log(context, status, performance.now() - start)
+            throw error
+        }
+    }
+
+    private log(context: HttpContext, status: number, elapsed: number): void {
         const method = context.request.method.padEnd(6)
         const url = new URL(context.request.url).pathname
-        const status = response.status
         const color = getStatusColor(status)
-
+        const milliseconds = elapsed.toFixed(2)
         this.logger.info(`${color}${method}${reset} ${url} → ${color}${status}${reset} ${dim}${milliseconds}ms${reset}`)
-
-        return response
     }
 }

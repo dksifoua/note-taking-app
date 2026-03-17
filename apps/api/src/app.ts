@@ -1,7 +1,7 @@
 import { HttpApplication, HttpRouter } from "@shared/http"
 import { Logger } from "@shared/logging"
 import { ServiceCollection } from "@shared/ioc"
-import { RootHandler, UserHandler } from "./handlers"
+import { AuthHandler, RootHandler, UserHandler } from "./handlers"
 import { DatabaseContext } from "./persistence"
 import mongoose from "mongoose"
 import { UserRepository } from "./repositories"
@@ -25,6 +25,7 @@ services.addSingleton(JsonBodyParserMiddleware)
 services.addScoped(DatabaseContext)
 services.addScoped(UserRepository)
 services.addScoped(UserService)
+services.addScoped(AuthHandler)
 services.addScoped(UserHandler)
 services.addScoped(RootHandler)
 
@@ -33,6 +34,9 @@ const provider = services.build()
 const router = new HttpRouter()
     .get("/", (ctx) => ctx.scope.resolve(RootHandler).home())
     .get("/version", (ctx) => ctx.scope.resolve(RootHandler).version())
+    .mount("/auth", new HttpRouter()
+        .post("/register", (ctx) => ctx.scope.resolve(AuthHandler).register(ctx))
+    )
     .mount("/users", new HttpRouter()
         .get("/", (ctx) => ctx.scope.resolve(UserHandler).retrieve())
     )

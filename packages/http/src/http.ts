@@ -49,7 +49,6 @@ export class HttpApplication implements IHttpApplication {
     public listen(port?: number): void {
         const self = this
 
-        // Ensure we pass a valid port only when provided; Bun.serve treats `port: undefined` as invalid in some environments.
         const serveOptions: Bun.Serve.Options<undefined> = {
             port: port,
             async fetch(request: Request): Promise<Response> {
@@ -59,7 +58,7 @@ export class HttpApplication implements IHttpApplication {
                 try {
                     return await self.applyMiddlewares(
                         context,
-                        (ctx: HttpContext): MayBePromise<Response> => self.router.handle(ctx.request, ctx.scope)
+                        (ctx: HttpContext): MayBePromise<Response> => self.router.handle(ctx)
                     )
                 } catch (error) {
                     return self.handleError(error)

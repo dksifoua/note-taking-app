@@ -18,13 +18,18 @@ export class UserService implements IUserService {
     public async getUserByEmail(email: string): Promise<IUserDocument> {
         const user: IUserDocument | null = await this.userRepository.findByEmail(email)
         if (!user) {
-            throw new Error(`User with email ${email} not found`)
+            throw new Error(`User with email [${email}] not found.`)
         }
         
         return user
     }
     
     public async createUser(email: string, password: string): Promise<IUserDocument> {
+        let existingUser = await this.userRepository.findByEmail(email)
+        if (existingUser !== null) {
+            throw new Error(`User with email [${email}] already exists.`)
+        }
+        
         return this.userRepository.create({ email, password })
     }
     

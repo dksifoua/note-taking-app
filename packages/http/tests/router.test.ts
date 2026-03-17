@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "bun:test"
 import { type HttpContext, HttpRouter, RouteNotFoundHttpError } from "../src"
-import { makeRequest, mockScope, okHandler } from "./utils"
+import { makeContext, mockScope, okHandler } from "./utils"
 
 describe("HttpRouter", (): void => {
     let router: HttpRouter
@@ -66,19 +66,19 @@ describe("HttpRouter", (): void => {
             router.get("/users", async (): Promise<Response> =>
                 new Response("users list", { status: 200 })
             )
-            const response = await router.handle(makeRequest("GET", "/users"), mockScope)
+            const response = await router.handle(makeContext("GET", "/users", mockScope))
             expect(response.status).toBe(200)
             expect(await response.text()).toBe("users list")
         })
         
         it("should throw HttpRouteNotFoundError when no route matches", (): void => {
-            expect(() => router.handle(makeRequest("GET", "/unknown"), mockScope))
+            expect(() => router.handle(makeContext("GET", "/unknown", mockScope)))
                 .toThrow(RouteNotFoundHttpError)
         })
 
         it("should throw HttpRouteNotFoundError when method does not match", (): void => {
             router.get("/users", okHandler)
-            expect(() => router.handle(makeRequest("POST", "/users"), mockScope))
+            expect(() => router.handle(makeContext("POST", "/users", mockScope)))
                 .toThrow(RouteNotFoundHttpError)
         })
 
@@ -86,7 +86,7 @@ describe("HttpRouter", (): void => {
             router.get("/users/:id", async (ctx: HttpContext): Promise<Response> =>
                 new Response(ctx.params.id, { status: 200 })
             )
-            const response = await router.handle(makeRequest("GET", "/users/42"), mockScope)
+            const response = await router.handle(makeContext("GET", "/users/42", mockScope))
             expect(await response.text()).toBe("42")
         })
 
@@ -94,7 +94,7 @@ describe("HttpRouter", (): void => {
             router.get("/users/:userId/posts/:postId", async (ctx: HttpContext): Promise<Response> =>
                 Response.json({ userId: ctx.params.userId, postId: ctx.params.postId })
             )
-            const response = await router.handle(makeRequest("GET", "/users/1/posts/2"), mockScope)
+            const response = await router.handle(makeContext("GET", "/users/1/posts/2", mockScope))
             const body = await response.json()
             expect(body).toEqual({ userId: "1", postId: "2" })
         })
@@ -105,7 +105,7 @@ describe("HttpRouter", (): void => {
                 receivedScope = ctx.scope
                 return new Response("ok")
             })
-            await router.handle(makeRequest("GET", "/test"), mockScope)
+            await router.handle(makeContext("GET", "/test", mockScope))
             expect(receivedScope).toBe(mockScope)
         })
 
@@ -115,22 +115,22 @@ describe("HttpRouter", (): void => {
                 receivedRequest = ctx.request
                 return new Response("ok")
             })
-            const request = makeRequest("GET", "/test")
-            await router.handle(request, mockScope)
-            expect(receivedRequest).toBe(request)
+            const context = makeContext("GET", "/test", mockScope)
+            await router.handle(context)
+            expect(receivedRequest).toBe(context.request)
         })
 
         it("should rethrow non-routing errors from handlers", async (): Promise<void> => {
             router.get("/boom", async (): Promise<Response> => {
                 throw new Error("Something went wrong")
             })
-            expect(router.handle(makeRequest("GET", "/boom"), mockScope))
+            expect(router.handle(makeContext("GET", "/boom", mockScope)))
                 .rejects.toThrow("Something went wrong")
         })
 
         it("should tolerate trailing slashes on request URL", async (): Promise<void> => {
             router.get("/users", okHandler)
-            const response = await router.handle(makeRequest("GET", "/users/"), mockScope)
+            const response = await router.handle(makeContext("GET", "/users/", mockScope))
             expect(response.status).toBe(200)
         })
     })
@@ -151,7 +151,7 @@ describe("HttpRouter", (): void => {
             const sub = new HttpRouter()
             sub.get("/", async (): Promise<Response> => new Response("mounted", { status: 200 }))
             router.mount("/users", sub)
-            const response = await router.handle(makeRequest("GET", "/users"), mockScope)
+            const response = await router.handle(makeContext("GET", "/users", mockScope))
             expect(response.status).toBe(200)
             expect(await response.text()).toBe("mounted")
         })
@@ -167,7 +167,7 @@ describe("HttpRouter", (): void => {
             const sub = new HttpRouter()
             sub.get("/:id", async (ctx: HttpContext): Promise<Response> => new Response(ctx.params.id))
             router.mount("/users", sub)
-            const response = await router.handle(makeRequest("GET", "/users/99"), mockScope)
+            const response = await router.handle(makeContext("GET", "/users/99", mockScope))
             expect(await response.text()).toBe("99")
         })
 

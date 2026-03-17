@@ -1,6 +1,5 @@
-import type { HttpCompiledRoute, HttpHandler, HttpMethod, HttpRouteParams, IHttpRouter } from "./types"
+import type { HttpCompiledRoute, HttpContext, HttpHandler, HttpMethod, HttpRouteParams, IHttpRouter } from "./types"
 import { RouteNotFoundHttpError } from "./errors"
-import type { IServiceProvider } from "@shared/ioc"
 
 export class HttpRouter implements IHttpRouter {
     public readonly routes: HttpCompiledRoute[]
@@ -19,9 +18,9 @@ export class HttpRouter implements IHttpRouter {
         return this
     }
 
-    public async handle(request: Request, scope: IServiceProvider): Promise<Response> {
-        const { route, params } = this.match(request)
-        return route.handlerFn({ request, params, scope })
+    public async handle(context: HttpContext): Promise<Response> {
+        const { route, params } = this.match(context.request)
+        return route.handlerFn({ ...context, params })
     }
 
     public get(pathname: string, handlerFn: HttpHandler): IHttpRouter {
