@@ -10,7 +10,6 @@
     "scripts": {
         "clean": "rm -rf coveragereport",
         "dev:api": "bun --env-file=.env --watch apps/api run dev",
-        
         "test": "bun test packages/*",
         "test:ioc": "bun test packages/ioc",
         "test:http": "bun test packages/http",

@@ -1,19 +1,26 @@
-import { UserService } from "../services"
+import { AuthService } from "../services"
 import { Injectable } from "@shared/ioc"
 import type { HttpContext } from "@shared/http"
-import type { IUser } from "../schemas"
+import { type AuthRequest, AuthRequestSchema, HttpResponse, validate } from "./requests"
 
 @Injectable()
 export class AuthHandler {
-    private readonly userService: UserService
+    private readonly authService: AuthService
 
-    public constructor(userService: UserService) {
-        this.userService = userService
+    public constructor(authService: AuthService) {
+        this.authService = authService
     }
 
-    public async register(context: HttpContext): Promise<Response> {
-        const { email, password } = context.body as IUser
-        const createdUser = await this.userService.createUser(email, password)
-        return Response.json(createdUser, { status: 201 })
+    public async registration(context: HttpContext): Promise<Response> {
+        const { email, password } = validate<AuthRequest>(AuthRequestSchema, context.body)
+        const createdUser = await this.authService.registerUser(email, password)
+        const origin = new URL(context.request.url).origin
+        return HttpResponse.created({ Location: `${origin}/api/users/${createdUser._id}` })
+    }
+
+    public async login(context: HttpContext): Promise<Response> {
+        const { email, password } = validate<AuthRequest>(AuthRequestSchema, context.body)
+        const { token } = await this.authService.loginUser(email, password)
+        return HttpResponse.noContent({ "Set-Cookie": `token=${token}; HttpOnly; SameSite=Strict; Max-Age=3600` })
     }
 }

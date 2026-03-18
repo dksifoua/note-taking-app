@@ -16,8 +16,16 @@ export class UserRepository implements IUserRepository {
         return this.context.Users.find().exec()
     }
 
+    public async findById(id: string): Promise<IUserDocument | null> {
+        return this.context.Users.findById(id).exec()
+    }
+
     public async findByEmail(email: string): Promise<IUserDocument | null> {
         return this.context.Users.findOne({ email }).exec()
+    }
+
+    public async existByEmail(email: string): Promise<boolean> {
+        return (await this.context.Users.exists({ email }).exec()) !== null
     }
 
     public async create(data: IUser, session?: ClientSession): Promise<IUserDocument> {
@@ -31,7 +39,7 @@ export class UserRepository implements IUserRepository {
     
     public async delete(id: string, session?: ClientSession): Promise<void> {
         if (!await this.context.Users.findByIdAndDelete(id, { session }).exec()) {
-            throw new Error(`User with id ${id} not found`)
+            throw new Error(`User with id [${id}] not found`)
         }
     }
 }
